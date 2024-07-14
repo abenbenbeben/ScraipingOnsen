@@ -9,7 +9,7 @@ from controller.NearStController import *
 driver = webdriver.Chrome()
 
 def scraiping_main():
-    rownum = 3
+    rownum = 2
 
 
     placeName = read_spreadsheet(f"A{rownum}")
@@ -18,12 +18,14 @@ def scraiping_main():
     cells = [chr(i) for i in range(ord('B'), ord('L') + 1)]
 
     # 各セルからキーワードを読み込み、search_kutikomi関数を実行して結果を表示
+    forcount = 0
     for cell in cells:
         search_keywords = read_spreadsheet(f"{cell}1").split(",")  # セルからキーワードを読み込む
         total_elements = 0
         for keyword in search_keywords:
-            elements = search_kutikomi(driver,keyword.strip())  # strip()を使って前後の余分な空白を削除
+            elements = search_kutikomi(driver,keyword.strip(),forcount)  # strip()を使って前後の余分な空白を削除
             total_elements = max(total_elements,len(elements))
+            forcount = forcount + 1
         write_spreadsheet(f"{cell}{rownum}",total_elements)
 
 
