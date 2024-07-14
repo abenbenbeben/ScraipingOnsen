@@ -68,15 +68,24 @@ def search_kutikomi(driver,search_word,forcount):
     # 口コミ文を含む要素をすべて検索
     reviews = driver.find_elements(By.CSS_SELECTOR, 'span.wiI7pd')
 
-    # 口コミ文を表示し、それぞれに番号を振る
+    # 含まれている口コミの数をカウントする変数
+    count = 0
+
+    # 口コミ文を表示し、それぞれに番号を振り、単語が含まれているかをチェック
     for index, review in enumerate(reviews, start=1):
-        print(f"{index}. {review.text}")
+        review_text = review.text
+        if search_word in review_text:
+            count += 1
+            contains_word = "Yes"
+        else:
+            contains_word = "No"
+        print(f"{index}. {review_text} (Contains '{search_word}': {contains_word})")
 
 
     input_element.clear()
 
 
-    return elements
+    return count
 
 
 if __name__ == "__main__":

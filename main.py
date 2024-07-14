@@ -23,8 +23,8 @@ def scraiping_main():
         search_keywords = read_spreadsheet(f"{cell}1").split(",")  # セルからキーワードを読み込む
         total_elements = 0
         for keyword in search_keywords:
-            elements = search_kutikomi(driver,keyword.strip(),forcount)  # strip()を使って前後の余分な空白を削除
-            total_elements = max(total_elements,len(elements))
+            elements_count = search_kutikomi(driver,keyword.strip(),forcount)  # strip()を使って前後の余分な空白を削除
+            total_elements = max(total_elements,elements_count)
             forcount = forcount + 1
         write_spreadsheet(f"{cell}{rownum}",total_elements)
 
