@@ -27,7 +27,7 @@ def read_spreadsheet(cell):
     value = sheet.acell(cell).value
     return value
 
-# スピプレッドシートから読み込み
+# スピプレッドシートから書き込み
 def write_spreadsheet(cell, value):
     # 使用するスコープ
     scope = ['https://www.googleapis.com/auth/spreadsheets']

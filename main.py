@@ -6,6 +6,7 @@ from components.RetrieveKutikomi import open_kutikomi, search_kutikomi
 from components.RequestPlacesAPI import *
 from controller.CostContoroller import ServeCost
 from controller.NearStController import * 
+from controller.ImageContoroller import *
 driver = webdriver.Chrome()
 
 def scraiping_main():
@@ -35,6 +36,8 @@ def scraiping_main():
 
     ServeCost(driver, "東京都", placeName, rownum)
     SearchNearStatiion(placeApiInfo["lat"],placeApiInfo["lng"],rownum)
+
+    ServeImage(rownum, placeName, placeApiInfo("url"))
 
     # ブラウザを閉じる
     driver.quit()

@@ -23,15 +23,21 @@ def get_photos_from_website(url):
 
 
 
-def search_photos(query, api_key, cse_id, website_url):
+def search_photos(query, website_url):
+    cse_id = 'e710a5adbb57440b4'
+    api_key = os.getenv("PLACES_API_KEY")
     url = f"https://www.googleapis.com/customsearch/v1?q={query}&cx={cse_id}&key={api_key}&searchType=image"
     response = requests.get(url)
     results = response.json()
-    # IPアドレスのエラー時に出力する。
+    
     if 'error' in results and results['error']['code'] == 403:
         print(results)
     else:
-        return [item['link'] for item in results.get('items', []) if item['link'].startswith(website_url)]
+        items = results.get('items', [])
+        website_links = [item['link'] for item in items if item['link'].startswith(website_url)]
+        other_links = [item['link'] for item in items if not item['link'].startswith(website_url)]
+        sorted_links = website_links + other_links
+        return sorted_links
 
 
 
@@ -42,10 +48,8 @@ if __name__ == "__main__":
     #driver = webdriver.Chrome()
     website_url = 'https://saunarium-lava.com/'  # スーパー銭湯のURLを指定
     # photos = get_photos_from_website(website_url)
-    api_key = os.getenv("PLACES_API_KEY")
-    cse_id = 'e710a5adbb57440b4'
     query = 'サウナリウム高円寺'
-    photos = search_photos(query, api_key, cse_id, website_url)
+    photos = search_photos(query, website_url)
     for photo in photos:
         print(photo)
 
