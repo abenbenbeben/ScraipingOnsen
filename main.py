@@ -10,7 +10,7 @@ from controller.ImageContoroller import *
 driver = webdriver.Chrome()
 
 def scraiping_main():
-    rownum = 2
+    rownum = 4
 
 
     placeName = read_spreadsheet(f"A{rownum}")
@@ -37,7 +37,7 @@ def scraiping_main():
     ServeCost(driver, "東京都", placeName, rownum)
     SearchNearStatiion(placeApiInfo["lat"],placeApiInfo["lng"],rownum)
 
-    ServeImage(rownum, placeName, placeApiInfo("url"))
+    ServeImage(rownum, placeName, placeApiInfo["url"])
 
     # ブラウザを閉じる
     driver.quit()

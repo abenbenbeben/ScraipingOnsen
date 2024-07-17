@@ -41,8 +41,6 @@ def run_checkobject(file_uri) -> bool:
     response = client.object_localization(image=image)
     objects = response.localized_object_annotations
 
-    print(objects)
-
     # Check if any of the detected objects is a person
     for object_ in objects:
         if object_.name.lower() == "person":

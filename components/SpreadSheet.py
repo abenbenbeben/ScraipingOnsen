@@ -13,7 +13,7 @@ def read_spreadsheet(cell):
     scope = ['https://www.googleapis.com/auth/spreadsheets']
 
     # サービスアカウントキーファイルへのパス
-    creds = ServiceAccountCredentials.from_json_keyfile_name('onsenscraiping-010c634e8f24.json', scope)
+    creds = ServiceAccountCredentials.from_json_keyfile_name('/Users/abeyuichi/スクレイピング/onsenscraiping-010c634e8f24.json', scope)
 
     # 認証
     client = gspread.authorize(creds)
@@ -33,7 +33,7 @@ def write_spreadsheet(cell, value):
     scope = ['https://www.googleapis.com/auth/spreadsheets']
 
     # サービスアカウントキーファイルへのパス
-    creds = ServiceAccountCredentials.from_json_keyfile_name('onsenscraiping-010c634e8f24.json', scope)
+    creds = ServiceAccountCredentials.from_json_keyfile_name('/Users/abeyuichi/スクレイピング/onsenscraiping-010c634e8f24.json', scope)
 
     # 認証
     client = gspread.authorize(creds)
