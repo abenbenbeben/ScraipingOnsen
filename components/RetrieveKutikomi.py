@@ -34,11 +34,14 @@ def open_kutikomi(driver,placeName):
     if len(search_buttons) >= 3:
         search_button = search_buttons[2]
     else:
-        raise Exception("該当する要素が3つ以上見つかりませんでした")
+        print(placeName + " : 同一名称あり")
+        return False
     # ボタンをクリック
     search_button.click()
 
     time.sleep(3)  # 5秒間待機
+
+    return True
 
 def search_kutikomi(driver,search_word,forcount):
     if(forcount==0):
@@ -65,8 +68,20 @@ def search_kutikomi(driver,search_word,forcount):
     # 特定のクラス名を持つdiv要素をすべて見つける
     elements = driver.find_elements(By.CSS_SELECTOR, "div.jftiEf.fontBodyMedium")
 
-    # 口コミ文を含む要素をすべて検索
+
     reviews = driver.find_elements(By.CSS_SELECTOR, 'span.wiI7pd')
+    no_item_div = driver.find_elements(By.CSS_SELECTOR, 'div.AA3gcf')
+
+    print(f"rebview: {len(reviews)}")
+    print(f"no_item_div: {len(no_item_div)}")
+
+
+    # 口コミ文を含む要素をすべて検索
+    while(len(reviews)==0 and len(no_item_div)<1):
+        print("ロード中、再取得")
+        time.sleep(4)
+        reviews = driver.find_elements(By.CSS_SELECTOR, 'span.wiI7pd')
+        no_item_div = driver.find_elements(By.CSS_SELECTOR, 'div.AA3gcf')
 
     # 含まれている口コミの数をカウントする変数
     count = 0
@@ -90,7 +105,7 @@ def search_kutikomi(driver,search_word,forcount):
 
 if __name__ == "__main__":
     driver = webdriver.Chrome()
-    placeName = "沼部公園"
-    search_word = "子供"
+    placeName = "COCOFURO かが浴場"
+    search_word = "泥"
     open_kutikomi(driver,placeName)
     search_kutikomi(driver,search_word)

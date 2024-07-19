@@ -10,11 +10,13 @@ from controller.ImageContoroller import *
 driver = webdriver.Chrome()
 
 def scraiping_main():
-    rownum = 4
+    rownum = 6
 
 
     placeName = read_spreadsheet(f"A{rownum}")
-    open_kutikomi(driver,placeName)
+    if(not open_kutikomi(driver,placeName)):
+        write_spreadsheet(f"B{rownum}","同一名称あり")
+        return
     # スプレッドシートのセル位置リスト
     cells = [chr(i) for i in range(ord('B'), ord('L') + 1)]
 

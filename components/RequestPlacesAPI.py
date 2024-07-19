@@ -21,7 +21,11 @@ def get_placeapi_data(place_name):
     url_overview = "https://maps.googleapis.com/maps/api/place/textsearch/json"
 
     res_overview = requests.get(url_overview, params= params)
+    if 'error_message' in res_overview.text:
+        print(res_overview.text)
+        raise Exception("IPアドレスエラー")
     place = json.loads(res_overview.text)
+
     # 緯度経度を抽出
     lat = place['results'][0]['geometry']['location']['lat']
     lng = place['results'][0]['geometry']['location']['lng']

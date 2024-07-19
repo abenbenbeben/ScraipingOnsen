@@ -32,6 +32,8 @@ def search_photos(query, website_url):
     
     if 'error' in results and results['error']['code'] == 403:
         print(results)
+        raise Exception("IPアドレスエラー")
+        
     else:
         items = results.get('items', [])
         website_links = [item['link'] for item in items if item['link'].startswith(website_url)]
