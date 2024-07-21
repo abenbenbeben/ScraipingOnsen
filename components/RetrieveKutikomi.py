@@ -50,10 +50,9 @@ def search_kutikomi(driver,search_word,forcount):
         # 2つ目の要素虫眼鏡を抽出
         if len(appearinput_elements) >= 2:
             appearinput_element = appearinput_elements[1]
+            appearinput_element.click()
         else:
-            raise Exception("該当する要素が2つ以上見つかりませんでした")
-
-        appearinput_element.click()
+            print("虫眼鏡がありませんでした。")
 
     time.sleep(3)  # 5秒間待機
     # 指定クラス名を持つinput要素を見つける
@@ -85,16 +84,18 @@ def search_kutikomi(driver,search_word,forcount):
 
     # 含まれている口コミの数をカウントする変数
     count = 0
+    search_word_lower = search_word.lower()
 
     # 口コミ文を表示し、それぞれに番号を振り、単語が含まれているかをチェック
     for index, review in enumerate(reviews, start=1):
         review_text = review.text
-        if search_word in review_text:
+        review_text_lower = review_text.lower()
+        if search_word_lower in review_text_lower:
             count += 1
             contains_word = "Yes"
         else:
             contains_word = "No"
-        print(f"{index}. {review_text} (Contains '{search_word}': {contains_word})")
+        print(f"{index}. {review_text_lower} (Contains '{search_word_lower}': {contains_word})")
 
 
     input_element.clear()

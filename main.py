@@ -10,7 +10,7 @@ from controller.ImageContoroller import *
 driver = webdriver.Chrome()
 
 def scraiping_main():
-    rownum = 6
+    rownum = 7
 
 
     placeName = read_spreadsheet(f"A{rownum}")
@@ -37,9 +37,10 @@ def scraiping_main():
     write_spreadsheet_placeapi(rownum, placeApiInfo)
 
     ServeCost(driver, "東京都", placeName, rownum)
+    # GoogleAPIで返却された施設名を使用。
     SearchNearStatiion(placeApiInfo["lat"],placeApiInfo["lng"],rownum)
 
-    ServeImage(rownum, placeName, placeApiInfo["url"])
+    ServeImage(rownum, placeApiInfo["name"], placeApiInfo["url"])
 
     # ブラウザを閉じる
     driver.quit()

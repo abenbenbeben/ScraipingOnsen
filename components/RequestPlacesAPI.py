@@ -41,8 +41,13 @@ def get_placeapi_data(place_name):
     res_detail = requests.get(url_detail, params= params_detail)
     place_detail = json.loads(res_detail.text)
 
-    # 営業時間
-    periods = place_detail['result']["opening_hours"]["periods"]
+    # 初期値をNoneに設定
+    opentime_day_0 = opentime_day_1 = opentime_day_2 = opentime_day_3 = opentime_day_4 = opentime_day_5 = opentime_day_6 = None
+    closetime_day_0 = closetime_day_1 = closetime_day_2 = closetime_day_3 = closetime_day_4 = closetime_day_5 = closetime_day_6 = None
+
+    # periodsが存在するか確認し、存在する場合は処理を行う
+    periods = place_detail['result'].get("opening_hours", {}).get("periods", [])
+
     for period in periods:
         if period['open']['day'] == 0:
             opentime_day_0 = period['open']['time']
@@ -58,7 +63,7 @@ def get_placeapi_data(place_name):
             opentime_day_5 = period['open']['time']
         elif period['open']['day'] == 6:
             opentime_day_6 = period['open']['time']
-        
+
         if period['close']['day'] == 0:
             closetime_day_0 = period['close']['time']
         elif period['close']['day'] == 1:
@@ -81,6 +86,9 @@ def get_placeapi_data(place_name):
 
     # webサイトURL
     url = place_detail['result']['website']
+
+    #　正式名称
+    name = place_detail['result']['name']
 
     # 県名
     html_code = place_detail['result']['adr_address']
@@ -109,6 +117,7 @@ def get_placeapi_data(place_name):
         "address": address,
         "url": url,
         "prefecture_name": prefecture_name,
+        "name": name,
     }
 
     return result
@@ -136,11 +145,12 @@ def get_nearby_placeapi(lat,long):
                     "latitude": lat,
                     "longitude": long
                 },
-                "radius": 500.0
+                "radius": 1000.0
             }
         }
     }
 
+    data = None
     response = requests.post(url, headers=headers, data=json.dumps(payload))
     if json.loads(response.text) != {}:
         data = json.loads(response.text)
@@ -161,13 +171,16 @@ def get_nearby_placeapi(lat,long):
         data_distancematrix = json.loads(response_distancematrix.text)
         distance_text = data_distancematrix['rows'][0]['elements'][0]['distance']['text']
         duration_text = data_distancematrix['rows'][0]['elements'][0]['duration']['text']
+        station_name = data['places'][0]['displayName']['text']
     else:
         distance_text = "nostation"
+        station_name = ""
+    
     
     result = {
         "distance_text": distance_text,
         "duration_text": duration_text,
-        "station_name": data['places'][0]['displayName']['text']
+        "station_name": station_name
     }
 
     return result
@@ -176,8 +189,13 @@ def get_nearby_placeapi(lat,long):
 
     
 if __name__ == "__main__":
-    get_placeapi_data("サウナリウム高円寺")
-    lat = 35.891819906753824
-    long = 139.8580192374548
+    print("Script execution started")
+    dataresult = get_placeapi_data("ロスコ")
+    lat = dataresult["lat"]
+    long = dataresult["lng"]
+
+    print(lat)
+    print(long)
+
     # get_nearby_placeapi(lat,long)
 
