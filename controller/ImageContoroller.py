@@ -17,7 +17,7 @@ def ServeImage(rownum, query, website_url):
     for img in ImageLists:
         if len(OutPutImageLists) >= 7:
             break
-        if img.startswith(website_url):
+        if website_url is not None and img.startswith(website_url):
             OutPutImageLists.append(img)
         else:
             if not run_checkobject(img):

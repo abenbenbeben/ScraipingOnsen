@@ -84,8 +84,8 @@ def get_placeapi_data(place_name):
     address_parts = formatted_address.split(' ', 1)  # 最初のスペースで分割
     address = address_parts[1] if len(address_parts) > 1 else formatted_address
 
-    # webサイトURL
-    url = place_detail['result']['website']
+    # webサイトURLを取得
+    url = place_detail.get('result', {}).get('website')
 
     #　正式名称
     name = place_detail['result']['name']

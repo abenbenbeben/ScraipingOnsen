@@ -35,9 +35,13 @@ def search_photos(query, website_url):
         raise Exception("IPアドレスエラー")
     else:
         items = results.get('items', [])
-        website_links = [item['link'] for item in items if item['link'].startswith(website_url)]
-        other_links = [item['link'] for item in items if not item['link'].startswith(website_url)]
-        sorted_links = website_links + other_links
+        if website_url is not None:
+            website_links = [item['link'] for item in items if item['link'].startswith(website_url)]
+            other_links = [item['link'] for item in items if not item['link'].startswith(website_url)]
+            sorted_links = website_links + other_links
+        else:
+            sorted_links = [item['link'] for item in items]
+            
         return sorted_links
 
 

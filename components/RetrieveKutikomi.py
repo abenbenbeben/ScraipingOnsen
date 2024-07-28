@@ -2,6 +2,9 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 import time, sys
+import spacy
+sys.path.append('../')
+from components.SentenceBert import SentenceBertService
 
 
 def open_kutikomi(driver,placeName):
@@ -86,17 +89,46 @@ def search_kutikomi(driver,search_word,forcount):
     count = 0
     search_word_lower = search_word.lower()
 
-    # 口コミ文を表示し、それぞれに番号を振り、単語が含まれているかをチェック
+    nlp = spacy.load("ja_core_news_sm")
+
+    # 類似度を計算する文のリスト
+    sentences_to_compare = []
+    temp_sentences = []
+
+    if(search_word=="サウナ"):
+        temp_sentences.append("サウナは無し")
+        
     for index, review in enumerate(reviews, start=1):
         review_text = review.text
         review_text_lower = review_text.lower()
+        doc = nlp(review_text_lower)
+
+        contains_word = "No"
         if search_word_lower in review_text_lower:
-            count += 1
-            contains_word = "Yes"
-        else:
-            contains_word = "No"
+            # 否定的な文脈があるかチェック
+            negative_context = False
+            
+            for sentence in doc.sents:
+                if search_word_lower in sentence.text:
+                    temp_sentences.append(sentence.text)
+            sentences_to_compare.append((temp_sentences, negative_context))
+        
         print(f"{index}. {review_text_lower} (Contains '{search_word_lower}': {contains_word})")
 
+    print(temp_sentences)
+
+    if(search_word=="サウナ"):
+        result = SentenceBertService(temp_sentences) 
+        for item in result:
+            if item["sim"]>=0.5:
+                count = count - 1
+            else:
+                count = count + 1
+    else:
+        count = len(temp_sentences)
+
+    
+    print(count)
 
     input_element.clear()
 
@@ -106,7 +138,7 @@ def search_kutikomi(driver,search_word,forcount):
 
 if __name__ == "__main__":
     driver = webdriver.Chrome()
-    placeName = "COCOFURO かが浴場"
-    search_word = "泥"
+    placeName = "第一金乗湯"
+    search_word = "サウナ"
     open_kutikomi(driver,placeName)
-    search_kutikomi(driver,search_word)
+    search_kutikomi(driver,search_word,0)

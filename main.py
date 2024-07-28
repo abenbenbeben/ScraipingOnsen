@@ -10,7 +10,7 @@ from controller.ImageContoroller import *
 driver = webdriver.Chrome()
 
 def scraiping_main():
-    rownum = 7
+    rownum = 9
 
 
     placeName = read_spreadsheet(f"A{rownum}")
