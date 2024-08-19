@@ -68,5 +68,5 @@ def SentenceBertService(sentences):
 
 
 if __name__ == "__main__":
-    sentences = ["サウナは無し", "サウナが温度が高くとても良い","サウナとミストサウナがめちゃくちゃ汗かける"]
+    sentences = ["ロウリュウがほしい", "ロウリュウの機械を追加するのも良いかもと","泉質も良く、炭酸水も癒やされる良いところ ロウリュウサービスをして欲しいのと、キャッシュレス対応をして欲しいのと、下駄箱の百円のところは改善して欲しい"]
     SentenceBertService(sentences)

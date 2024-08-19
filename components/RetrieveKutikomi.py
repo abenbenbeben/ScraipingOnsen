@@ -1,11 +1,12 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-import time, sys
+import time, sys, pprint
 import spacy
 sys.path.append('../')
 from components.SentenceBert import SentenceBertService
-
+from components.ConnectChatGpt import requestGpt
+from components.SpreadSheet import write_spreadsheet
 
 def open_kutikomi(driver,placeName):
 
@@ -51,7 +52,11 @@ def search_kutikomi(driver,search_word,forcount):
         # 虫眼鏡をクリック
         appearinput_elements = driver.find_elements(By.CSS_SELECTOR, "button.g88MCb.S9kvJb")
         # 2つ目の要素虫眼鏡を抽出
-        if len(appearinput_elements) >= 2:
+        print(len(appearinput_elements))
+        if len(appearinput_elements) == 2:
+            appearinput_element = appearinput_elements[0]
+            appearinput_element.click()
+        elif(len(appearinput_elements) > 2):
             appearinput_element = appearinput_elements[1]
             appearinput_element.click()
         else:
@@ -74,7 +79,7 @@ def search_kutikomi(driver,search_word,forcount):
     reviews = driver.find_elements(By.CSS_SELECTOR, 'span.wiI7pd')
     no_item_div = driver.find_elements(By.CSS_SELECTOR, 'div.AA3gcf')
 
-    print(f"rebview: {len(reviews)}")
+    print(f"review: {len(reviews)}")
     print(f"no_item_div: {len(no_item_div)}")
 
 
@@ -94,9 +99,7 @@ def search_kutikomi(driver,search_word,forcount):
     # 類似度を計算する文のリスト
     sentences_to_compare = []
     temp_sentences = []
-
-    if(search_word=="サウナ"):
-        temp_sentences.append("サウナは無し")
+    temp_sentences.append(f"{search_word}は無し")
         
     for index, review in enumerate(reviews, start=1):
         review_text = review.text
@@ -113,22 +116,41 @@ def search_kutikomi(driver,search_word,forcount):
                     temp_sentences.append(sentence.text)
             sentences_to_compare.append((temp_sentences, negative_context))
         
-        print(f"{index}. {review_text_lower} (Contains '{search_word_lower}': {contains_word})")
+        # print(f"{index}. {review_text_lower} (Contains '{search_word_lower}': {contains_word})")
 
-    print(temp_sentences)
 
-    if(search_word=="サウナ"):
-        result = SentenceBertService(temp_sentences) 
+    if(len(temp_sentences)==1):
+        count = 0
+    elif(len(temp_sentences) >= 2 and len(temp_sentences) <= 3):
+        temp_sentences.pop(0)
+        systemContent = f"以下の口コミを参考に、{search_word}がある場合は1ない場合は0と回答して。回答例を遵守。"
+        data_string = "\n口コミ:".join(f"{x}" for x in temp_sentences)
+        print("口コミ:" + data_string)
+        userContent = "回答例: {'result': 1}\n\n" + "口コミ:" + data_string
+
+        raw_result = requestGpt(systemContent,userContent)
+
+        print(raw_result)
+
+        try:
+            # 辞書型に変換を試みる
+            result_gpt = eval(raw_result)
+            pprint.pprint(result_gpt["result"])
+        except (SyntaxError, ValueError):
+            result_gpt = raw_result
+        count = result_gpt
+
+    else:
+        result = SentenceBertService(temp_sentences)
+        result.pop(0) # 最初の文章を除外
         for item in result:
             if item["sim"]>=0.5:
                 count = count - 1
             else:
                 count = count + 1
-    else:
-        count = len(temp_sentences)
 
-    
-    print(count)
+
+
 
     input_element.clear()
 
@@ -138,7 +160,7 @@ def search_kutikomi(driver,search_word,forcount):
 
 if __name__ == "__main__":
     driver = webdriver.Chrome()
-    placeName = "第一金乗湯"
-    search_word = "サウナ"
+    placeName = "千代乃湯"
+    search_word = "塩サウナ"
     open_kutikomi(driver,placeName)
     search_kutikomi(driver,search_word,0)
