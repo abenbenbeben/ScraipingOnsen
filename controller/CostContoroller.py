@@ -9,7 +9,7 @@ def ServeCost(driver, PlefectureName, PlaceName, rownum):
     data = RetrieveCost(driver, PlefectureName, PlaceName)
 
     systemContent = "以下の料金表を参考に、平日と休日の大人料金を教えて。時間記載がある場合2時間利用した際の料金を想定。回答例を遵守。"
-    data_string = '\n'.join([f"{item[0]}: {item[1]}" for item in data])
+    data_string = '\n'.join([': '.join(item) for item in data])
     userContent = "回答例: {'heijitu': 1000, 'kyujitu': 1200}\n\n" + data_string
 
     raw_result = requestGpt(systemContent,userContent)

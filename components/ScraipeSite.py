@@ -35,6 +35,6 @@ def RetrieveCost(driver, PlefectureName, PlaceName):
 
 if __name__ == "__main__":
     driver = webdriver.Chrome()
-    PlaceName = "サウナリウム高円寺"
+    PlaceName = "仙川 湯けむりの里"
     PlefectureName = "東京都"
     RetrieveCost(driver,PlefectureName,PlaceName)

@@ -6,6 +6,22 @@ import os
 # 環境変数をロードする
 load_dotenv()
 
+def check_firewall():
+    api_key = os.getenv("PLACES_API_KEY")
+    params = {
+        "query": "沼部公園",
+        "key":api_key,
+        "region" : "jp",
+        "language" : "ja",
+    }
+    url_overview = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+
+    res_overview = requests.get(url_overview, params= params)
+    if 'error_message' in res_overview.text:
+        print(res_overview.text)
+        raise Exception("IPアドレスエラー")
+
+
 
 def get_placeapi_data(place_name):
     api_key = os.getenv("PLACES_API_KEY")
@@ -45,6 +61,10 @@ def get_placeapi_data(place_name):
     opentime_day_0 = opentime_day_1 = opentime_day_2 = opentime_day_3 = opentime_day_4 = opentime_day_5 = opentime_day_6 = None
     closetime_day_0 = closetime_day_1 = closetime_day_2 = closetime_day_3 = closetime_day_4 = closetime_day_5 = closetime_day_6 = None
 
+    
+    if 'result' not in place_detail:
+        pprint.pprint(place_detail)
+        raise KeyError("place_detail に 'result' キーが見つかりません。")
     # periodsが存在するか確認し、存在する場合は処理を行う
     periods = place_detail['result'].get("opening_hours", {}).get("periods", [])
 
@@ -190,7 +210,7 @@ def get_nearby_placeapi(lat,long):
     
 if __name__ == "__main__":
     print("Script execution started")
-    dataresult = get_placeapi_data("ロスコ")
+    dataresult = get_placeapi_data("千代乃湯")
     lat = dataresult["lat"]
     long = dataresult["lng"]
 

@@ -8,7 +8,7 @@ from components.SentenceBert import SentenceBertService
 from components.ConnectChatGpt import requestGpt
 from components.SpreadSheet import write_spreadsheet
 
-def open_kutikomi(driver,placeName):
+def open_kutikomi(driver,placeName, placenum=None):
 
     # Googleのホームページを開く
     driver.get("https://www.google.com/maps")
@@ -32,11 +32,23 @@ def open_kutikomi(driver,placeName):
     #     sys.exit()
 
     # "class"属性が"hh2c6"のボタン要素を見つける
-    search_buttons = driver.find_elements(By.CSS_SELECTOR, "button.hh2c6")
 
-    # 3つ目の要素を抽出
-    if len(search_buttons) >= 3:
+    if placenum is not None:
+        search_links = driver.find_elements(By.CSS_SELECTOR, "a.hfpxzc")
+        search_links[placenum].click()
+        time.sleep(3)
+    
+
+    search_buttons = driver.find_elements(By.CSS_SELECTOR, "button.hh2c6")
+    print("search_buttons: " + str(len(search_buttons)))
+
+    # 3つ目or4つ目の要素を抽出
+    if len(search_buttons) == 3:
+        search_button = search_buttons[1]
+    elif len(search_buttons) == 4:
         search_button = search_buttons[2]
+    elif len(search_buttons) >= 5: # ホテルタイプ用
+        search_button = search_buttons[3]
     else:
         print(placeName + " : 同一名称あり")
         return False
@@ -50,14 +62,11 @@ def open_kutikomi(driver,placeName):
 def search_kutikomi(driver,search_word,forcount):
     if(forcount==0):
         # 虫眼鏡をクリック
-        appearinput_elements = driver.find_elements(By.CSS_SELECTOR, "button.g88MCb.S9kvJb")
+        appearinput_elements = driver.find_elements(By.CSS_SELECTOR, "button.g88MCb.S9kvJb[data-value='クチコミを検索']")
         # 2つ目の要素虫眼鏡を抽出
         print(len(appearinput_elements))
-        if len(appearinput_elements) == 2:
+        if len(appearinput_elements) == 1:
             appearinput_element = appearinput_elements[0]
-            appearinput_element.click()
-        elif(len(appearinput_elements) > 2):
-            appearinput_element = appearinput_elements[1]
             appearinput_element.click()
         else:
             print("虫眼鏡がありませんでした。")
@@ -92,6 +101,7 @@ def search_kutikomi(driver,search_word,forcount):
 
     # 含まれている口コミの数をカウントする変数
     count = 0
+    note = None
     search_word_lower = search_word.lower()
 
     nlp = spacy.load("ja_core_news_sm")
@@ -132,13 +142,16 @@ def search_kutikomi(driver,search_word,forcount):
 
         print(raw_result)
 
+        note = ",\n".join(f"{x}" for x in temp_sentences)
         try:
             # 辞書型に変換を試みる
             result_gpt = eval(raw_result)
             pprint.pprint(result_gpt["result"])
+            count = result_gpt["result"]
         except (SyntaxError, ValueError):
             result_gpt = raw_result
-        count = result_gpt
+            count = 0
+        
 
     else:
         result = SentenceBertService(temp_sentences)
@@ -150,17 +163,19 @@ def search_kutikomi(driver,search_word,forcount):
                 count = count + 1
 
 
-
-
     input_element.clear()
 
+    result = {
+        "count": count,
+        "note": note if note is not None else None
+    }
 
-    return count
+    return result
 
 
 if __name__ == "__main__":
     driver = webdriver.Chrome()
-    placeName = "千代乃湯"
-    search_word = "塩サウナ"
+    placeName = "もえぎの湯"
+    search_word = "サウナ"
     open_kutikomi(driver,placeName)
     search_kutikomi(driver,search_word,0)
