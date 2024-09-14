@@ -26,21 +26,23 @@ def read_spreadsheet(cell):
     value = sheet.acell(cell).value
     return value
 
-# スピプレッドシートから書き込み
-def write_spreadsheet(cell, value, note=None):
+# スピプレッドシートから全読み込み
+def read_all_spreadsheet(sheetnum=0):
+    worksheet = spreadsheet.get_worksheet(sheetnum)
+    value = worksheet.get_values()
+    return value
 
+# スピプレッドシートから範囲書き込み
+def write_multi_spreadsheet(cell, value,sheetnum=0):
+    worksheet = spreadsheet.get_worksheet(sheetnum)
     # 指定されたセルに値を書き込み
-    sheet.update_acell(cell, value)
+    worksheet.update(cell, value)
 
-    if note:
-        url = "https://script.google.com/macros/s/AKfycbx9u3FzZ7Vnu6wo39bJYMH5Oh-Pj0sPUNixlEjHGcYmT6Cys7-y6xlspaoZ13Rq97j9Ig/exec"
-        data = {
-            'cell': cell,  # メモを追加するセル
-            'note': note  # 追加するメモの内容
-        }
-        response = requests.post(url, data=json.dumps(data))
-
-        print(response.text)
+# スピプレッドシートから書き込み
+def write_spreadsheet(cell, value, sheetnum=0):
+    worksheet = spreadsheet.get_worksheet(sheetnum)
+    # 指定されたセルに値を書き込み
+    worksheet.update_acell(cell, value)
 
 # Excelのカラム計算関数
 def excel_column(index):
@@ -67,6 +69,20 @@ def write_spreadsheet_placeapi(rownum, placeApiInfo):
     for data_key in additional_data:
         write_spreadsheet(f"{excel_column(base_index)}{rownum}", placeApiInfo[data_key])
         base_index += 1
+
+# 開始時間〜urlの書き込み補助関数
+def write_spreadsheet_placeapi_rfd(rownum, placeApiInfo):
+    base_index = 13  # Mのアルファベットインデックス (13 -> M)
+    data = []
+    data_row = []
+    # オープン時間とクローズ時間を書き込む
+    for day in range(7):
+        open_key = f"opentime_day_{day}"
+        close_key = f"closetime_day_{day}"
+        data_row.append(placeApiInfo[open_key])
+        data_row.append(placeApiInfo[close_key])
+    data.append(data_row)
+    write_multi_spreadsheet(f"M{rownum}:Z{rownum}",data)
 
     
 if __name__ == "__main__":

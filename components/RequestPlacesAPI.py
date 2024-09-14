@@ -69,35 +69,37 @@ def get_placeapi_data(place_name):
     periods = place_detail['result'].get("opening_hours", {}).get("periods", [])
 
     for period in periods:
-        if period['open']['day'] == 0:
-            opentime_day_0 = period['open']['time']
-        elif period['open']['day'] == 1:
-            opentime_day_1 = period['open']['time']
-        elif period['open']['day'] == 2:
-            opentime_day_2 = period['open']['time']
-        elif period['open']['day'] == 3:
-            opentime_day_3 = period['open']['time']
-        elif period['open']['day'] == 4:
-            opentime_day_4 = period['open']['time']
-        elif period['open']['day'] == 5:
-            opentime_day_5 = period['open']['time']
-        elif period['open']['day'] == 6:
-            opentime_day_6 = period['open']['time']
+        if 'open' in period:
+            if period['open']['day'] == 0:
+                opentime_day_0 = period['open']['time']
+            elif period['open']['day'] == 1:
+                opentime_day_1 = period['open']['time']
+            elif period['open']['day'] == 2:
+                opentime_day_2 = period['open']['time']
+            elif period['open']['day'] == 3:
+                opentime_day_3 = period['open']['time']
+            elif period['open']['day'] == 4:
+                opentime_day_4 = period['open']['time']
+            elif period['open']['day'] == 5:
+                opentime_day_5 = period['open']['time']
+            elif period['open']['day'] == 6:
+                opentime_day_6 = period['open']['time']
 
-        if period['close']['day'] == 0:
-            closetime_day_0 = period['close']['time']
-        elif period['close']['day'] == 1:
-            closetime_day_1 = period['close']['time']
-        elif period['close']['day'] == 2:
-            closetime_day_2 = period['close']['time']
-        elif period['close']['day'] == 3:
-            closetime_day_3 = period['close']['time']
-        elif period['close']['day'] == 4:
-            closetime_day_4 = period['close']['time']
-        elif period['close']['day'] == 5:
-            closetime_day_5 = period['close']['time']
-        elif period['close']['day'] == 6:
-            closetime_day_6 = period['close']['time']
+        if 'close' in period:
+            if period['close']['day'] == 0:
+                closetime_day_0 = period['close']['time']
+            elif period['close']['day'] == 1:
+                closetime_day_1 = period['close']['time']
+            elif period['close']['day'] == 2:
+                closetime_day_2 = period['close']['time']
+            elif period['close']['day'] == 3:
+                closetime_day_3 = period['close']['time']
+            elif period['close']['day'] == 4:
+                closetime_day_4 = period['close']['time']
+            elif period['close']['day'] == 5:
+                closetime_day_5 = period['close']['time']
+            elif period['close']['day'] == 6:
+                closetime_day_6 = period['close']['time']
     
     # 住所の抽出
     formatted_address = place_detail['result']['formatted_address']
