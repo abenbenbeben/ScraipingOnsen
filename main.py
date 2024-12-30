@@ -34,7 +34,7 @@ def scraiping_main(rownum, placenum=None):
                     note = note + result_kutikomi["note"] + "\n\n"
                 else:
                     note = result_kutikomi["note"] + "\n\n"
-        write_spreadsheet(f"{cell}{rownum}",total_elements,note)
+        write_spreadsheet(f"{cell}{rownum}",total_elements, note)
 
 
     # GooglePlaceApi
@@ -47,15 +47,33 @@ def scraiping_main(rownum, placenum=None):
 
     ServeImage(rownum, placeApiInfo["name"], placeApiInfo["url"])
 
+
+def temporary_main(placeName, rownum):
+    # ====================================
+    placeName = "松乃湯"
+    placeName_kensakuSite = "松乃湯"
+    # ====================================
+
+    # GooglePlaceApi
+    placeApiInfo = get_placeapi_data(placeName)
+    write_spreadsheet_placeapi(rownum, placeApiInfo)
+
+    # ServeCost(driver, "東京都", placeName_kensakuSite, rownum)
+    # GoogleAPIで返却された施設名を使用。
+    SearchNearStatiion(placeApiInfo["lat"],placeApiInfo["lng"],rownum)
+
+    ServeImage(rownum, placeApiInfo["name"], placeApiInfo["url"])
+
     
 
     
 
 if __name__ == "__main__":
     check_firewall()
-    placenum = 0 # 同一名称存在している場合に指定
-    for value in range(41, 42):
-       scraiping_main(value,placenum)
+    # placenum = None # 同一名称存在している場合に指定
+    for value in range(5, 6):
+    #    scraiping_main(value)
+       temporary_main("松の湯",value)
        print("休憩中")
        time.sleep(30)
     # scraiping_main(17)

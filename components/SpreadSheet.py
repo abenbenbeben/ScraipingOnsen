@@ -39,10 +39,20 @@ def write_multi_spreadsheet(cell, value,sheetnum=0):
     worksheet.update(cell, value)
 
 # スピプレッドシートから書き込み
-def write_spreadsheet(cell, value, sheetnum=0):
+def write_spreadsheet(cell, value,note=None, sheetnum=0):
     worksheet = spreadsheet.get_worksheet(sheetnum)
     # 指定されたセルに値を書き込み
     worksheet.update_acell(cell, value)
+    
+    if note:
+        url = "https://script.google.com/macros/s/AKfycbx9u3FzZ7Vnu6wo39bJYMH5Oh-Pj0sPUNixlEjHGcYmT6Cys7-y6xlspaoZ13Rq97j9Ig/exec"
+        data = {
+            'cell': cell,  # メモを追加するセル
+            'note': note  # 追加するメモの内容
+        }
+        response = requests.post(url, data=json.dumps(data))
+
+        print(response.text)
 
 # Excelのカラム計算関数
 def excel_column(index):

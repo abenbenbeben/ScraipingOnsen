@@ -254,6 +254,8 @@ def search_kutikomi_rr(driver,search_word,forcount):
 
     return result
 
+
+# 特徴文章の生成
 def search_feature(driver):
 
     # 特定のクラス名を持つdiv要素をすべて見つける
@@ -269,12 +271,6 @@ def search_feature(driver):
         reviews = driver.find_elements(By.CSS_SELECTOR, 'span.wiI7pd')
         no_item_div = driver.find_elements(By.CSS_SELECTOR, 'div.AA3gcf')
 
-    # 含まれている口コミの数をカウントする変数
-    count = 0
-    note = None
-
-    nlp = spacy.load("ja_core_news_sm")
-
     # 口コミ文のリスト
     temp_sentences = []
         
@@ -289,7 +285,7 @@ def search_feature(driver):
 
     gptResult = requestGpt(systemContent,userContent)
 
-    print("=======特徴文章=========================")
+    print("=======特徴文章========================")
     pprint.pprint(gptResult)
     print("======================================")
 

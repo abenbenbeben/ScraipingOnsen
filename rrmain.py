@@ -1,4 +1,4 @@
-# RetrieveReview
+# RetrieveReview〜口コミの取得
 from selenium import webdriver
 import time, sys, pprint
 import firebase_admin
@@ -16,7 +16,7 @@ labels = [["サウナ"],["ロウリュウ","ロウリュ"],["塩サウナ"],["�
 #既存データに対して、口コミを調べる。
 def incorporateReviews_existed():
     # ==同一名称存在時===================================
-    indirecteRow = 104
+    indirecteRow = 258
     placenum = None
     sameNameFlag = True
     # =================================================
@@ -102,11 +102,11 @@ def incorporateReviews_new():
     sheetValue.pop(0)
     value = [item[:12] for item in sheetValue]
 
-    # value = value[:1]
-    value = value[deleteElement:] # 最初の⚪︎個の要素を消す。
+    value = value[:1] # 最初の⚪︎子の要素を抽出する。
+    # value = value[deleteElement:] # 最初の⚪︎個の要素を消す。
     
-
     insertData = []
+    
     insertLabel = ["温泉名"]
     for label in labels:
         insertLabel_child = []
