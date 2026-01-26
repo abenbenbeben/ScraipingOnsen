@@ -1,11 +1,14 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException, StaleElementReferenceException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import time, sys, pprint
 import spacy
 sys.path.append('../')
 from components.SentenceBert import SentenceBertService
-from components.ConnectChatGpt import requestGpt
+from components.ConnectGemini import requestGemini
 from components.SpreadSheet import write_spreadsheet
 
 def open_kutikomi(driver,placeName, placenum=None):
@@ -65,17 +68,49 @@ def open_kutikomi(driver,placeName, placenum=None):
 
     return True
 
-def search_kutikomi(driver,search_word,forcount):
-    if(forcount==0):
-        # 虫眼鏡をクリック
-        appearinput_elements = driver.find_elements(By.CSS_SELECTOR, "button.g88MCb.S9kvJb[data-value='クチコミを検索']")
-        # 2つ目の要素虫眼鏡を抽出
-        print(len(appearinput_elements))
-        if len(appearinput_elements) == 1:
-            appearinput_element = appearinput_elements[0]
-            appearinput_element.click()
-        else:
-            print("虫眼鏡がありませんでした。")
+def click_kutikomi_search_button(driver, timeout=10) -> bool:
+    # まずは aria-label / data-value で直指定（最優先）
+    xpaths = [
+        "//button[@aria-label='クチコミを検索']",
+        "//button[@data-value='クチコミを検索']",
+        "//button[@data-tooltip='クチコミを検索']",
+        "//button[contains(@aria-label,'クチコミ') and contains(@aria-label,'検索')]",
+    ]
+
+    for xp in xpaths:
+        try:
+            btn = WebDriverWait(driver, timeout).until(
+                EC.element_to_be_clickable((By.XPATH, xp))
+            )
+            driver.execute_script("arguments[0].scrollIntoView({block:'center'});", btn)
+
+            try:
+                btn.click()
+            except (ElementClickInterceptedException, StaleElementReferenceException):
+                driver.execute_script("arguments[0].click();", btn)
+
+            return True
+        except TimeoutException:
+            continue
+
+    # フォールバック：S9kvJbの中から aria-label が一致する「表示されているもの」を探してクリック
+    buttons = driver.find_elements(By.CSS_SELECTOR, "button.S9kvJb")
+    for b in buttons:
+        if (b.get_attribute("aria-label") == "クチコミを検索"
+            and b.is_displayed()
+            and b.is_enabled()):
+            driver.execute_script("arguments[0].scrollIntoView({block:'center'});", b)
+            driver.execute_script("arguments[0].click();", b)
+            return True
+
+    return False
+
+
+def search_kutikomi(driver, search_word, forcount):
+    if forcount == 0:
+        ok = click_kutikomi_search_button(driver, timeout=15)
+        if not ok:
+            print("虫眼鏡（クチコミを検索）が見つからない / クリックできませんでした")
 
     time.sleep(3)  # 5秒間待機
     # 指定クラス名を持つinput要素を見つける
@@ -139,12 +174,12 @@ def search_kutikomi(driver,search_word,forcount):
         count = 0
     elif(len(temp_sentences) >= 2 and len(temp_sentences) <= 3):
         temp_sentences.pop(0)
-        systemContent = f"以下の口コミを参考に、{search_word}がある場合は1ない場合は0と回答して。回答例を遵守。"
+        systemContent = f"以下の口コミを参考に、この施設に、{search_word}がある場合は1ない場合は0と回答して。回答例を遵守。"
         data_string = "\n口コミ:".join(f"{x}" for x in temp_sentences)
         print("口コミ:" + data_string)
         userContent = "回答例: {'result': 1}\n\n" + "口コミ:" + data_string
 
-        raw_result = requestGpt(systemContent,userContent)
+        raw_result = requestGemini(systemContent, userContent)
 
         print(raw_result)
 
@@ -285,7 +320,7 @@ def search_feature(driver):
     data_string = "\n口コミ:".join(f"{x}" for x in temp_sentences)
     userContent = "口コミ:" + data_string
 
-    gptResult = requestGpt(systemContent,userContent)
+    gptResult = requestGemini(systemContent, userContent)
 
     print("=======特徴文章========================")
     pprint.pprint(gptResult)

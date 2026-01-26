@@ -1,6 +1,6 @@
 import time, pprint, json, sys
 sys.path.append('../')
-from components.ConnectChatGpt import requestGpt
+from components.ConnectGemini import requestGemini
 from components.ScraipeSite import RetrieveCost
 from components.SpreadSheet import write_spreadsheet
 
@@ -12,7 +12,7 @@ def ServeCost(driver, PlefectureName, PlaceName, rownum):
     data_string = '\n'.join([': '.join(item) for item in data])
     userContent = "回答例: {'heijitu': 1000, 'kyujitu': 1200}\n\n" + data_string
 
-    raw_result = requestGpt(systemContent,userContent)
+    raw_result = requestGemini(systemContent,userContent)
     try:
         # 辞書型に変換を試みる
         result_gpt = eval(raw_result)

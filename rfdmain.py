@@ -1,3 +1,6 @@
+# 既存firebase→スプレッドシートに書き出し。
+# スプレッドシートは新規作成。
+
 import sys
 import firebase_admin
 from firebase_admin import credentials, firestore

@@ -14,9 +14,28 @@ creds = ServiceAccountCredentials.from_json_keyfile_name('/Users/abeyuichi/ス�
 # 認証
 client = gspread.authorize(creds)
 
-# スプレッドシートのIDを使って開く（スプレッドシートのURLから取得可能）
-spreadsheet = client.open_by_key('1xnWPdkeu-ouaSYuDSKDK_MFMpxyEeH_hKjkFFTFI1kM')
-sheet = spreadsheet.get_worksheet(0)  # 0は最初のシートを意味します
+# ----------------------------------------
+# ★ デフォルト（今までのままでも動く）
+# ----------------------------------------
+_DEFAULT_SPREADSHEET_KEY = '1xnWPdkeu-ouaSYuDSKDK_MFMpxyEeH_hKjkFFTFI1kM'
+_default_sheetnum = 0
+
+spreadsheet = client.open_by_key(_DEFAULT_SPREADSHEET_KEY)
+
+
+def configure_spreadsheet(spreadsheet_key: str, default_sheetnum: int = 0):
+    """
+    ★ main.py から呼んで「書き込み先スプレッドシート」を切り替える
+    """
+    global spreadsheet, _default_sheetnum
+    spreadsheet = client.open_by_key(spreadsheet_key)
+    _default_sheetnum = default_sheetnum
+
+def _ws(sheetnum=None):
+    """内部：対象worksheetを返す（指定がなければ default_sheetnum）"""
+    if sheetnum is None:
+        sheetnum = _default_sheetnum
+    return spreadsheet.get_worksheet(sheetnum)
 
 # -----------------------------
 # 追加：新規シート（タブ）作成
@@ -50,31 +69,25 @@ def create_new_worksheet(title=None, rows=5000, cols=200):
 
 
 # スピプレッドシートから読み込み
-def read_spreadsheet(cell, sheetnum=0):
-    worksheet = spreadsheet.get_worksheet(sheetnum)
-    return worksheet.acell(cell).value
+def read_spreadsheet(cell, sheetnum=None):
+    return _ws(sheetnum).acell(cell).value
 
 # スピプレッドシートから全読み込み
 def read_all_spreadsheet(sheetnum=0):
-    worksheet = spreadsheet.get_worksheet(sheetnum)
-    return worksheet.get_values()
+    return _ws(sheetnum).get_values()
 
 # スピプレッドシートから範囲書き込み
 def write_multi_spreadsheet(cell, value, sheetnum=0):
-    worksheet = spreadsheet.get_worksheet(sheetnum)
-    worksheet.update(cell, value)
+    _ws(sheetnum).update(cell, value)
 
 # スピプレッドシートから書き込み
 def write_spreadsheet(cell, value, note=None, sheetnum=0):
-    worksheet = spreadsheet.get_worksheet(sheetnum)
-    worksheet.update_acell(cell, value)
+    ws = _ws(sheetnum)
+    ws.update_acell(cell, value)
 
     if note:
         url = "https://script.google.com/macros/s/AKfycbx9u3FzZ7Vnu6wo39bJYMH5Oh-Pj0sPUNixlEjHGcYmT6Cys7-y6xlspaoZ13Rq97j9Ig/exec"
-        data = {
-            'cell': cell,
-            'note': note
-        }
+        data = {'cell': cell, 'note': note}
         response = requests.post(url, data=json.dumps(data))
         print(response.text)
 
@@ -87,21 +100,18 @@ def excel_column(index):
     return column
 
 # 開始時間〜urlの書き込み補助関数
-def write_spreadsheet_placeapi(rownum, placeApiInfo):
-    base_index = 13  # Mのアルファベットインデックス (13 -> M)
-    # オープン時間とクローズ時間を書き込む
+def write_spreadsheet_placeapi(rownum, placeApiInfo, sheetnum=0):
+    base_index = 13  # M
     for day in range(7):
         open_key = f"opentime_day_{day}"
         close_key = f"closetime_day_{day}"
-        write_spreadsheet(f"{excel_column(base_index)}{rownum}", placeApiInfo[open_key])
+        write_spreadsheet(f"{excel_column(base_index)}{rownum}", placeApiInfo[open_key], sheetnum=sheetnum)
         base_index += 1
-        write_spreadsheet(f"{excel_column(base_index)}{rownum}", placeApiInfo[close_key])
+        write_spreadsheet(f"{excel_column(base_index)}{rownum}", placeApiInfo[close_key], sheetnum=sheetnum)
         base_index += 1
 
-    # 追加のデータ
-    additional_data = ["lat", "lng", "address", "url"]
-    for data_key in additional_data:
-        write_spreadsheet(f"{excel_column(base_index)}{rownum}", placeApiInfo[data_key])
+    for data_key in ["lat", "lng", "address", "url"]:
+        write_spreadsheet(f"{excel_column(base_index)}{rownum}", placeApiInfo[data_key], sheetnum=sheetnum)
         base_index += 1
 
 # 開始時間〜urlの書き込み補助関数
