@@ -1,201 +1,280 @@
-from selenium import webdriver
-import time, sys, pprint
+"""
+Firestore(温泉データ) → Googleスプレッドシートへ書き出すスクリプト
+
+- retrieveFirebase_onsen_data(): 旧スキーマ(onsen_data) をシートへ出力
+- retrieveFirebase_v2():         新スキーマ(onsen_data_v2) をシートへ出力
+- retrievePlaceInfo():           シートの温泉名 → PlaceAPI + 最寄駅検索 を追記
+
+注意:
+- firebase_admin.initialize_app() はプロセス内で1回だけ呼ぶ必要があります。
+  複数関数を連続実行する可能性があるので、初期化処理を共通化しています。
+"""
+
+import sys
+import time
 import firebase_admin
 from firebase_admin import credentials, firestore
-sys.path.append('../')
-from components.SpreadSheet import read_spreadsheet, write_spreadsheet, write_multi_spreadsheet, write_spreadsheet_placeapi_rfd
-from components.RequestPlacesAPI import *
-from controller.NearStController import * 
 
-# firebaseの既存データを全て引っ張ってくる関数
+sys.path.append("../")
+
+from components.SpreadSheet import (
+    read_spreadsheet,
+    write_multi_spreadsheet,
+    write_spreadsheet_placeapi_rfd,
+)
+
+from components.RequestPlacesAPI import get_placeapi_data
+from controller.NearStController import SearchNearStatiion
+
+
+# -----------------------------
+# 共通設定
+# -----------------------------
+SERVICE_ACCOUNT_JSON = "onsenmatching-firebase-adminsdk-qd1mg-ccda745b2d.json"
+
+COLLECTION_V1 = "onsen_data"
+COLLECTION_V2 = "onsen_data_v2"
+
+
+def get_firestore_client():
+    """
+    Firestoreクライアントを返す（Firebaseアプリ初期化もここで面倒を見る）
+    initialize_app は 1プロセス1回だけ必要なので、未初期化なら初期化する。
+    """
+    if not firebase_admin._apps:
+        cred = credentials.Certificate(SERVICE_ACCOUNT_JSON)
+        firebase_admin.initialize_app(cred)
+
+    return firestore.client()
+
+
+# ============================================================
+# v1: onsen_data → シート出力
+# ============================================================
 def retrieveFirebase_onsen_data():
-    # -------------------------------
-    collectionName = "onsen_data"
-    # -------------------------------
+    """
+    Firestore の onsen_data コレクションを読み取り、
+    スプレッドシートの A列〜BE列へ一括で書き込む。
 
-    # サービスアカウントキーのパスを指定してFirebaseアプリを初期化
-    cred = credentials.Certificate('onsenmatching-firebase-adminsdk-qd1mg-ccda745b2d.json')
-    firebase_admin.initialize_app(cred)
+    ※ v1は途中に「空列」が多く、列合わせのために空文字を挿入している。
+    """
+    db = get_firestore_client()
 
-    # Firestoreクライアントの初期化
-    db = firestore.client()
+    docs = db.collection(COLLECTION_V1).stream()
 
-    # コレクションからデータを取得
-    collection_ref = db.collection(collectionName)# onsen_dataに置換
-    docs = collection_ref.stream()
-
-    rownum = 2
     data = []
     count = 0
-        
-        # データの表示
+
     for doc in docs:
-        count = count + 1
+        count += 1
         data_dict = doc.to_dict()
-        row_data = []
+        row = []
 
-        # 各項目の追加（存在しない場合は空文字を追加）
-        row_data.append(data_dict.get("onsen_name", ""))  # A列 温泉名
-        row_data.append(data_dict.get("sauna", ""))  # B列 サウナ
-        row_data.append(data_dict.get("rouryu", ""))  # C列 ロウリュ
-        row_data.append(data_dict.get("siosauna", ""))  # D列 塩サウナ
-        row_data.append(data_dict.get("doro", ""))  # E列 泥
-        row_data.append(data_dict.get("mizuburo", ""))  # F列 水風呂
-        row_data.append(data_dict.get("tennen", ""))  # G列 天然
-        row_data.append(data_dict.get("tansan", ""))  # H列 炭酸風呂
-        row_data.append(data_dict.get("manga", ""))  # I列 漫画
-        row_data.append(data_dict.get("wifi", ""))  # J列 wifi
-        row_data.append(data_dict.get("ganban", ""))  # K列 岩盤
-        row_data.append(data_dict.get("facewash", ""))  # L列 洗顔
-        row_data.append(data_dict.get("zikan_heijitu_start", ""))  # M列 平日開始時間
-        row_data.append(data_dict.get("zikan_heijitu_end", ""))  # N列 平日終了時間
+        # -------------------------
+        # A〜N: 基本情報（v1）
+        # -------------------------
+        row.append(data_dict.get("onsen_name", ""))          # A: 温泉名
+        row.append(data_dict.get("sauna", ""))               # B: サウナ
+        row.append(data_dict.get("rouryu", ""))              # C: ロウリュ
+        row.append(data_dict.get("siosauna", ""))            # D: 塩サウナ
+        row.append(data_dict.get("doro", ""))                # E: 泥
+        row.append(data_dict.get("mizuburo", ""))            # F: 水風呂
+        row.append(data_dict.get("tennen", ""))              # G: 天然
+        row.append(data_dict.get("tansan", ""))              # H: 炭酸風呂
+        row.append(data_dict.get("manga", ""))               # I: 漫画
+        row.append(data_dict.get("wifi", ""))                # J: wifi
+        row.append(data_dict.get("ganban", ""))              # K: 岩盤
+        row.append(data_dict.get("facewash", ""))            # L: 洗顔
+        row.append(data_dict.get("zikan_heijitu_start", "")) # M: 平日開始
+        row.append(data_dict.get("zikan_heijitu_end", ""))   # N: 平日終了
 
-        # OからV列は空列なので、空文字を追加
-        row_data.extend([""] * 8)
+        # O〜V: 旧シート仕様で空欄が必要（列合わせ）
+        row.extend([""] * 8)
 
-        row_data.append(data_dict.get("zikan_kyujitu_start", ""))  # W列 休日開始時間
-        row_data.append(data_dict.get("zikan_kyujitu_end", ""))  # X列 休日終了時間
+        # W〜X: 休日
+        row.append(data_dict.get("zikan_kyujitu_start", "")) # W: 休日開始
+        row.append(data_dict.get("zikan_kyujitu_end", ""))   # X: 休日終了
 
-        # YからZ列は空列なので、空文字を追加
-        row_data.extend([""] * 2)
+        # Y〜Z: 空欄（列合わせ）
+        row.extend([""] * 2)
 
-        row_data.append(data_dict.get("latitude", ""))  # AA列 緯度
-        row_data.append(data_dict.get("longitude", ""))  # AB列 経度
-        row_data.append(data_dict.get("place", ""))  # AC列 住所
-        row_data.append(data_dict.get("url", ""))  # AD列 URL
-        row_data.append(data_dict.get("heijitunedan", ""))  # AE列 平日値段
-        row_data.append(data_dict.get("kyuzitunedan", ""))  # AF列 休日値段
+        # AA〜AF: 位置/価格など
+        row.append(data_dict.get("latitude", ""))            # AA: 緯度
+        row.append(data_dict.get("longitude", ""))           # AB: 経度
+        row.append(data_dict.get("place", ""))               # AC: 住所
+        row.append(data_dict.get("url", ""))                 # AD: URL
+        row.append(data_dict.get("heijitunedan", ""))        # AE: 平日値段
+        row.append(data_dict.get("kyuzitunedan", ""))        # AF: 休日値段
 
-        # AGからAJ列は空列なので、空文字を追加
-        row_data.extend([""] * 4)
+        # AG〜AJ: 空欄（列合わせ）
+        row.extend([""] * 4)
 
-        # 画像URLの追加（最大10個）
-        images_count = len(data_dict.get("images", []))
+        # -------------------------
+        # 画像URL（最大10個）
+        # -------------------------
+        images = data_dict.get("images", []) or []
         for i in range(10):
-            if i < images_count:
-                row_data.append(data_dict["images"][i])
-            else:
-                row_data.append("")  # 画像が不足している場合、空欄を追加
+            row.append(images[i] if i < len(images) else "")
 
-        row_data.append(doc.id)  # AU列 id
-        row_data.append(data_dict.get("feature", ""))  # AV列 特徴
-        row_data.append(data_dict.get("komiguai", ""))  # AW列 
-        row_data.append(data_dict.get("wadai", ""))  # AX列 
-        row_data.append(data_dict.get("furosyurui", ""))  # AY列 お湯の種類
-        row_data.append(data_dict.get("sensituyosa", ""))  # AZ列 泉質
-        row_data.append(data_dict.get("senzai", ""))  # BA列 少し良いシャンプー
-        row_data.append(data_dict.get("kodomo", ""))  # BB列 子供も楽しめる
-        row_data.append(data_dict.get("ganbansyurui", ""))  # BC列 
-        row_data.append(data_dict.get("tyusyazyo", ""))  # BD列 駐車場
-        row_data.append(data_dict.get("sensitu", ""))  # BE列
+        # AU〜BE: 追加情報
+        row.append(doc.id)                         # AU: Firestore doc.id
+        row.append(data_dict.get("feature", ""))   # AV: 特徴
+        row.append(data_dict.get("komiguai", ""))  # AW
+        row.append(data_dict.get("wadai", ""))     # AX
+        row.append(data_dict.get("furosyurui", ""))# AY: お湯の種類
+        row.append(data_dict.get("sensituyosa", ""))# AZ: 泉質(強さ?)
+        row.append(data_dict.get("senzai", ""))    # BA: 少し良いシャンプー
+        row.append(data_dict.get("kodomo", ""))    # BB: 子供も楽しめる
+        row.append(data_dict.get("ganbansyurui", ""))# BC
+        row.append(data_dict.get("tyusyazyo", "")) # BD: 駐車場
+        row.append(data_dict.get("sensitu", ""))   # BE
 
-        # 書き込み用のデータを更新
-        data.append(row_data)
+        data.append(row)
 
-    # データを一括でスプレッドシートに書き込む
+    # -------------------------
+    # スプレッドシートへ一括書込
+    # -------------------------
     start_row = 2
     write_multi_spreadsheet(f"A{start_row}:BE{start_row + count - 1}", data)
 
+
+# ============================================================
+# v2: onsen_data_v2 → シート出力
+# ============================================================
 def retrieveFirebase_v2():
-    # -------------------------------
-    collectionName = "onsen_data_v2"
-    # -------------------------------
+    """
+    Firestore の onsen_data_v2 コレクションを読み取り、
+    スプレッドシートへ一括で書き込む（v2の構造に合わせた列展開）
 
-    # サービスアカウントキーのパスを指定してFirebaseアプリを初期化
-    cred = credentials.Certificate('onsenmatching-firebase-adminsdk-qd1mg-ccda745b2d.json')
-    firebase_admin.initialize_app(cred)
+    注意:
+    - periods の要素が欠ける可能性があるので安全に取り出す
+    - ekitika が存在しない/空の場合もあるので get で安全に取り出す
+    """
+    db = get_firestore_client()
 
-    # Firestoreクライアントの初期化
-    db = firestore.client()
+    docs = db.collection(COLLECTION_V2).stream()
 
-    # コレクションからデータを取得
-    collection_ref = db.collection(collectionName)
-    docs = collection_ref.stream()
-
-    rownum = 2
     data = []
     count = 0
-        
-        # データの表示
+
+    def get_period_time(periods, day, key):
+        """
+        periods: [{"day":0,"open":"...","close":"..."}, ...] を想定
+        指定dayの open/close を返す。無ければ空文字。
+        """
+        if not periods:
+            return ""
+        for p in periods:
+            if p.get("day") == day:
+                return p.get(key, "")
+        return ""
+
     for doc in docs:
-        count = count + 1
+        count += 1
         data_dict = doc.to_dict()
-        row_data = []
+        row = []
 
-        # 各項目の追加（存在しない場合は空文字を追加）
-        row_data.append(data_dict.get("onsen_name", ""))  # A列 温泉名
-        row_data.append(data_dict.get("sauna", ""))  # B列 サウナ
-        row_data.append(data_dict.get("rouryu", ""))  # C列 ロウリュ
-        row_data.append(data_dict.get("siosauna", ""))  # D列 塩サウナ
-        row_data.append(data_dict.get("doro", ""))  # E列 泥
-        row_data.append(data_dict.get("mizuburo", ""))  # F列 水風呂
-        row_data.append(data_dict.get("tennen", ""))  # G列 天然
-        row_data.append(data_dict.get("tansan", ""))  # H列 炭酸風呂
-        row_data.append(data_dict.get("manga", ""))  # I列 漫画
-        row_data.append(data_dict.get("wifi", ""))  # J列 wifi
-        row_data.append(data_dict.get("ganban", ""))  # K列 岩盤
-        row_data.append(data_dict.get("facewash", ""))  # L列 洗顔
-        row_data.append([item for item in data_dict["periods"] if item["day"] == 0][0]["open"]) # M列 
-        row_data.append([item for item in data_dict["periods"] if item["day"] == 0][0]["close"]) # N列
-        row_data.append([item for item in data_dict["periods"] if item["day"] == 1][0]["open"])# O列 
-        row_data.append([item for item in data_dict["periods"] if item["day"] == 1][0]["close"]) # P列
-        row_data.append([item for item in data_dict["periods"] if item["day"] == 2][0]["open"]) # Q列
-        row_data.append([item for item in data_dict["periods"] if item["day"] == 2][0]["close"]) # R列
-        row_data.append([item for item in data_dict["periods"] if item["day"] == 3][0]["open"]) # S列
-        row_data.append([item for item in data_dict["periods"] if item["day"] == 3][0]["close"]) # T列
-        row_data.append([item for item in data_dict["periods"] if item["day"] == 4][0]["open"]) # U列
-        row_data.append([item for item in data_dict["periods"] if item["day"] == 4][0]["close"]) # V列
-        row_data.append([item for item in data_dict["periods"] if item["day"] == 5][0]["open"]) # W列
-        row_data.append([item for item in data_dict["periods"] if item["day"] == 5][0]["close"]) # X列
-        row_data.append([item for item in data_dict["periods"] if item["day"] == 6][0]["open"]) # Y列
-        row_data.append([item for item in data_dict["periods"] if item["day"] == 6][0]["close"]) # Z列
-        row_data.append(data_dict.get("latitude", ""))  # AA列 緯度
-        row_data.append(data_dict.get("longitude", ""))  # AB列 経度
-        row_data.append(data_dict.get("place", ""))  # AC列 住所
-        row_data.append(data_dict.get("url", ""))  # AD列 URL
-        row_data.append(data_dict.get("heijitunedan", ""))  # AE列 平日値段
-        row_data.append(data_dict.get("kyuzitunedan", ""))  # AF列 休日値段
-        row_data.append("") # AG列 値段ソース（今後追加する可能性あるため残し）
-        row_data.append(data_dict.get("ekitika", "")["kyori"])  # AH列 駅からの距離
-        row_data.append(data_dict.get("ekitika", "")["zikan"])  # AI列 駅からの時間
-        row_data.append(data_dict.get("ekitika", "")["moyorieki"])  # AJ列 最寄駅
+        # -------------------------
+        # A〜L: 基本情報
+        # -------------------------
+        row.append(data_dict.get("onsen_name", ""))  # A: 温泉名
+        row.append(data_dict.get("sauna", ""))       # B
+        row.append(data_dict.get("rouryu", ""))      # C
+        row.append(data_dict.get("siosauna", ""))    # D
+        row.append(data_dict.get("doro", ""))        # E
+        row.append(data_dict.get("mizuburo", ""))    # F
+        row.append(data_dict.get("tennen", ""))      # G
+        row.append(data_dict.get("tansan", ""))      # H
+        row.append(data_dict.get("manga", ""))       # I
+        row.append(data_dict.get("wifi", ""))        # J
+        row.append(data_dict.get("ganban", ""))      # K
+        row.append(data_dict.get("facewash", ""))    # L
 
-        # 画像URLの追加（最大7個）
-        images_count = len(data_dict.get("images", []))
+        # -------------------------
+        # M〜Z: 曜日ごとの営業時間（day=0〜6）
+        # ここでは「open, close」を順に並べて列へ展開
+        # day=0: M,N / day=1: O,P / ... / day=6: Y,Z
+        # -------------------------
+        periods = data_dict.get("periods", []) or []
+        for day in range(7):
+            row.append(get_period_time(periods, day, "open"))
+            row.append(get_period_time(periods, day, "close"))
+
+        # -------------------------
+        # AA〜AF: 位置/URL/価格
+        # -------------------------
+        row.append(data_dict.get("latitude", ""))    # AA: 緯度
+        row.append(data_dict.get("longitude", ""))   # AB: 経度
+        row.append(data_dict.get("place", ""))       # AC: 住所
+        row.append(data_dict.get("url", ""))         # AD: URL
+        row.append(data_dict.get("heijitunedan", ""))# AE: 平日値段
+        row.append(data_dict.get("kyuzitunedan", ""))# AF: 休日値段
+
+        # AG: 値段ソース（将来用の空列）
+        row.append("")
+
+        # -------------------------
+        # AH〜AJ: 駅近情報（存在しない場合があるので安全に）
+        # -------------------------
+        ekitika = data_dict.get("ekitika") or {}
+        row.append(ekitika.get("kyori", ""))         # AH: 駅からの距離
+        row.append(ekitika.get("zikan", ""))         # AI: 駅からの時間
+        row.append(ekitika.get("moyorieki", ""))     # AJ: 最寄駅
+
+        # -------------------------
+        # 画像URL（最大7個）
+        # ※元コードでは AW〜 など列コメントがズレていたので「順番」を優先
+        # -------------------------
+        images = data_dict.get("images", []) or []
         for i in range(7):
-            if i < images_count:
-                row_data.append(data_dict["images"][i])
-            else:
-                row_data.append("")  # 画像が不足している場合、空欄を追加
+            row.append(images[i] if i < len(images) else "")
 
-        row_data.append(data_dict.get("feature", ""))  # AV列 特徴
-        row_data.append(doc.id)  # AU列 id
-        row_data.append(data_dict.get("onsenId", ""))  # AV列 特徴
+        # -------------------------
+        # 追加フィールド（v2）
+        # -------------------------
+        row.append(data_dict.get("feature", ""))     # (続きの列) 特徴
+        row.append(doc.id)                           # Firestore doc.id
+        row.append(data_dict.get("onsenId", ""))     # 温泉id
+        row.append(data_dict.get("syukuhaku", ""))   # 宿泊
 
-        
+        data.append(row)
 
-        # 書き込み用のデータを更新
-        data.append(row_data)
-
-    # データを一括でスプレッドシートに書き込む
+    # ここは「シートの列範囲」と row の長さが一致している必要あり
+    # ※元コードは A..BE を指定していましたが、row の実長と一致しているか要確認
     start_row = 2
     write_multi_spreadsheet(f"A{start_row}:BE{start_row + count - 1}", data)
 
 
-def retrievePlaceInfo(rownum):
-    placeName = read_spreadsheet(f"A{rownum}")
-    # GooglePlaceApi
-    placeApiInfo = get_placeapi_data(placeName)
-    write_spreadsheet_placeapi_rfd(rownum, placeApiInfo)
+# ============================================================
+# シートの温泉名 → PlaceAPI → シート追記 + 最寄駅検索
+# ============================================================
+def retrievePlaceInfo(rownum: int):
+    """
+    スプレッドシート A列にある施設名（温泉名）を読み、
+    Google Place API から緯度経度などを取得 → シートへ書込
+    その後、取得した lat/lng で最寄駅検索してシートへ書込
+    """
+    place_name = read_spreadsheet(f"A{rownum}")
 
-    # GoogleAPIで返却された施設名を使用。
-    SearchNearStatiion(placeApiInfo["lat"],placeApiInfo["lng"],rownum)
+    # Google Place API で施設情報を取得
+    place_info = get_placeapi_data(place_name)
+
+    # PlaceAPI結果を指定行へ反映
+    write_spreadsheet_placeapi_rfd(rownum, place_info)
+
+    # PlaceAPIの lat/lng を使って最寄駅情報を検索して反映
+    SearchNearStatiion(place_info["lat"], place_info["lng"], rownum)
 
 
-
+# ============================================================
+# エントリーポイント
+# ============================================================
 if __name__ == "__main__":
-    # for value in range(66, 260):
-    #    retrievePlaceInfo(value)
-    #    print("休憩中")
-    #    time.sleep(10)
+    # Place API を複数行に対して回す例（API制限回避でsleep）
+    # for row in range(66, 260):
+    #     retrievePlaceInfo(row)
+    #     print("休憩中...")
+    #     time.sleep(10)
+
+    # Firestore(v2) → シートへ出力
     retrieveFirebase_v2()

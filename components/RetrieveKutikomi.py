@@ -171,10 +171,12 @@ def search_kutikomi(driver,search_word,forcount):
 
     input_element.clear()
 
+    temp_sentences.pop(0) # 「〇〇は無し」の文を削除
+
     result = {
         "count": count,
         "note": note if note is not None else None,
-        "reviews": temp_sentences.pop(0),
+        "reviews": temp_sentences,
     }
 
     return result
