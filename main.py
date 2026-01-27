@@ -86,7 +86,7 @@ LOG_DUPLICATES = True
 # ★固定ヘッダー（この順で出力）
 # ==========================================================
 OUTPUT_HEADER_TEXT = """
-温泉名	サウナ	ロウリュウ,ロウリュ	塩サウナ	泥	水風呂	天然	炭酸風呂,炭酸泉	漫画	Wi-fi,wifi	岩盤	洗顔	宿泊	open_day0	close_day0	open_day1	close_day1	open_day2	close_day2	open_day3	close_day3	open_day4	close_day4	open_day5	close_day5	open_day6	close_day6	緯度	経度	住所	URL	平日値段	休日値段	値段ソース(空)	駅距離	駅時間	最寄駅	image1	image2	image3	image4	image5	image6	image7	特徴	docId	onsenId	宿泊フラグ	サウナ_口コミ1	サウナ_口コミ2	サウナ_口コミ3	サウナ_口コミ4	サウナ_口コミ5	サウナ_口コミ6	サウナ_口コミ7	サウナ_口コミ8	サウナ_口コミ9	サウナ_口コミ10	ロウリュウ,ロウリュ_口コミ1	ロウリュウ,ロウリュ_口コミ2	ロウリュウ,ロウリュ_口コミ3	ロウリュウ,ロウリュ_口コミ4	ロウリュウ,ロウリュ_口コミ5	ロウリュウ,ロウリュ_口コミ6	ロウリュウ,ロウリュ_口コミ7	ロウリュウ,ロウリュ_口コミ8	ロウリュウ,ロウリュ_口コミ9	ロウリュウ,ロウリュ_口コミ10	塩サウナ_口コミ1	塩サウナ_口コミ2	塩サウナ_口コミ3	塩サウナ_口コミ4	塩サウナ_口コミ5	塩サウナ_口コミ6	塩サウナ_口コミ7	塩サウナ_口コミ8	塩サウナ_口コミ9	塩サウナ_口コミ10	泥_口コミ1	泥_口コミ2	泥_口コミ3	泥_口コミ4	泥_口コミ5	泥_口コミ6	泥_口コミ7	泥_口コミ8	泥_口コミ9	泥_口コミ10	水風呂_口コミ1	水風呂_口コミ2	水風呂_口コミ3	水風呂_口コミ4	水風呂_口コミ5	水風呂_口コミ6	水風呂_口コミ7	水風呂_口コミ8	水風呂_口コミ9	水風呂_口コミ10	天然_口コミ1	天然_口コミ2	天然_口コミ3	天然_口コミ4	天然_口コミ5	天然_口コミ6	天然_口コミ7	天然_口コミ8	天然_口コミ9	天然_口コミ10	炭酸風呂,炭酸泉_口コミ1	炭酸風呂,炭酸泉_口コミ2	炭酸風呂,炭酸泉_口コミ3	炭酸風呂,炭酸泉_口コミ4	炭酸風呂,炭酸泉_口コミ5	炭酸風呂,炭酸泉_口コミ6	炭酸風呂,炭酸泉_口コミ7	炭酸風呂,炭酸泉_口コミ8	炭酸風呂,炭酸泉_口コミ9	炭酸風呂,炭酸泉_口コミ10	漫画_口コミ1	漫画_口コミ2	漫画_口コミ3	漫画_口コミ4	漫画_口コミ5	漫画_口コミ6	漫画_口コミ7	漫画_口コミ8	漫画_口コミ9	漫画_口コミ10	Wi-fi,wifi_口コミ1	Wi-fi,wifi_口コミ2	Wi-fi,wifi_口コミ3	Wi-fi,wifi_口コミ4	Wi-fi,wifi_口コミ5	Wi-fi,wifi_口コミ6	Wi-fi,wifi_口コミ7	Wi-fi,wifi_口コミ8	Wi-fi,wifi_口コミ9	Wi-fi,wifi_口コミ10	岩盤浴_口コミ1	岩盤浴_口コミ2	岩盤浴_口コミ3	岩盤浴_口コミ4	岩盤浴_口コミ5	岩盤浴_口コミ6	岩盤浴_口コミ7	岩盤浴_口コミ8	岩盤浴_口コミ9	岩盤浴_口コミ10	洗顔_口コミ1	洗顔_口コミ2	洗顔_口コミ3	洗顔_口コミ4	洗顔_口コミ5	洗顔_口コミ6	洗顔_口コミ7	洗顔_口コミ8	洗顔_口コミ9	洗顔_口コミ10	宿泊_件数	宿泊_note	宿泊_口コミ1	宿泊_口コミ2	宿泊_口コミ3	宿泊_口コミ4	宿泊_口コミ5	宿泊_口コミ6	宿泊_口コミ7	宿泊_口コミ8	宿泊_口コミ9	宿泊_口コミ10
+温泉名	サウナ	ロウリュウ,ロウリュ	塩サウナ	泥	水風呂	天然	炭酸風呂,炭酸泉	漫画	Wi-fi,wifi	岩盤	洗顔	宿泊	open_day0	close_day0	open_day1	close_day1	open_day2	close_day2	open_day3	close_day3	open_day4	close_day4	open_day5	close_day5	open_day6	close_day6	緯度	経度	住所	URL	平日値段	休日値段	値段ソース(空)	駅距離	駅時間	最寄駅	image1	image2	image3	image4	image5	image6	image7	特徴	docId	onsenId	サウナ_口コミ1	サウナ_口コミ2	サウナ_口コミ3	サウナ_口コミ4	サウナ_口コミ5	サウナ_口コミ6	サウナ_口コミ7	サウナ_口コミ8	サウナ_口コミ9	サウナ_口コミ10	ロウリュウ,ロウリュ_口コミ1	ロウリュウ,ロウリュ_口コミ2	ロウリュウ,ロウリュ_口コミ3	ロウリュウ,ロウリュ_口コミ4	ロウリュウ,ロウリュ_口コミ5	ロウリュウ,ロウリュ_口コミ6	ロウリュウ,ロウリュ_口コミ7	ロウリュウ,ロウリュ_口コミ8	ロウリュウ,ロウリュ_口コミ9	ロウリュウ,ロウリュ_口コミ10	塩サウナ_口コミ1	塩サウナ_口コミ2	塩サウナ_口コミ3	塩サウナ_口コミ4	塩サウナ_口コミ5	塩サウナ_口コミ6	塩サウナ_口コミ7	塩サウナ_口コミ8	塩サウナ_口コミ9	塩サウナ_口コミ10	泥_口コミ1	泥_口コミ2	泥_口コミ3	泥_口コミ4	泥_口コミ5	泥_口コミ6	泥_口コミ7	泥_口コミ8	泥_口コミ9	泥_口コミ10	水風呂_口コミ1	水風呂_口コミ2	水風呂_口コミ3	水風呂_口コミ4	水風呂_口コミ5	水風呂_口コミ6	水風呂_口コミ7	水風呂_口コミ8	水風呂_口コミ9	水風呂_口コミ10	天然_口コミ1	天然_口コミ2	天然_口コミ3	天然_口コミ4	天然_口コミ5	天然_口コミ6	天然_口コミ7	天然_口コミ8	天然_口コミ9	天然_口コミ10	炭酸風呂,炭酸泉_口コミ1	炭酸風呂,炭酸泉_口コミ2	炭酸風呂,炭酸泉_口コミ3	炭酸風呂,炭酸泉_口コミ4	炭酸風呂,炭酸泉_口コミ5	炭酸風呂,炭酸泉_口コミ6	炭酸風呂,炭酸泉_口コミ7	炭酸風呂,炭酸泉_口コミ8	炭酸風呂,炭酸泉_口コミ9	炭酸風呂,炭酸泉_口コミ10	漫画_口コミ1	漫画_口コミ2	漫画_口コミ3	漫画_口コミ4	漫画_口コミ5	漫画_口コミ6	漫画_口コミ7	漫画_口コミ8	漫画_口コミ9	漫画_口コミ10	Wi-fi,wifi_口コミ1	Wi-fi,wifi_口コミ2	Wi-fi,wifi_口コミ3	Wi-fi,wifi_口コミ4	Wi-fi,wifi_口コミ5	Wi-fi,wifi_口コミ6	Wi-fi,wifi_口コミ7	Wi-fi,wifi_口コミ8	Wi-fi,wifi_口コミ9	Wi-fi,wifi_口コミ10	岩盤浴_口コミ1	岩盤浴_口コミ2	岩盤浴_口コミ3	岩盤浴_口コミ4	岩盤浴_口コミ5	岩盤浴_口コミ6	岩盤浴_口コミ7	岩盤浴_口コミ8	岩盤浴_口コミ9	岩盤浴_口コミ10	洗顔_口コミ1	洗顔_口コミ2	洗顔_口コミ3	洗顔_口コミ4	洗顔_口コミ5	洗顔_口コミ6	洗顔_口コミ7	洗顔_口コミ8	洗顔_口コミ9	洗顔_口コミ10	宿泊_口コミ1	宿泊_口コミ2	宿泊_口コミ3	宿泊_口コミ4	宿泊_口コミ5	宿泊_口コミ6	宿泊_口コミ7	宿泊_口コミ8	宿泊_口コミ9	宿泊_口コミ10
 """.strip()
 
 OUTPUT_HEADERS = [h for h in re.split(r"[\t\n]+", OUTPUT_HEADER_TEXT) if h]
@@ -608,7 +608,7 @@ def scraiping_main(rownum, placenum=None, sheetnum=None):
 
         max_count = 0
         all_reviews = []
-        notes = []  # ★追加：noteを貯める
+        notes = []  # note（Gemini判定に使った文章など）があれば貯める
 
         for keyword in search_keywords:
             keyword = keyword.strip()
@@ -621,27 +621,16 @@ def scraiping_main(rownum, placenum=None, sheetnum=None):
             max_count = max(max_count, r.get("count", 0))
             all_reviews.extend(r.get("reviews") or [])
 
-            # ★追加：noteがあれば貯める
             if r.get("note"):
-                notes.append(f"[{keyword}] {r['note']}")  # keyword付けると後で見やすい
+                notes.append(f"[{keyword}] {r['note']}")
 
-        # ★「口コミ列は口コミのみ」
-        picked = write_reviews_to_cols(sheetnum, rownum, review_prefix, all_reviews, max_n=10)
+        # 口コミ列は口コミ文だけを書き込む（*_口コミ1..10）
+        write_reviews_to_cols(sheetnum, rownum, review_prefix, all_reviews, max_n=10)
 
-        # ★このカテゴリのnote（あれば）をまとめる
+        # このカテゴリの件数は cat_header 列に書く（宿泊も同様）
         note_text = "\n\n".join(notes) if notes else None
+        write_spreadsheet(f"{cat_col}{rownum}", max_count, note_text, sheetnum=sheetnum)
 
-        if cat_header == "宿泊" and "宿泊_件数" in HEADER_COL:
-            count_cell = f"{HEADER_COL['宿泊_件数']}{rownum}"
-            write_spreadsheet(count_cell, max_count, note_text, sheetnum=sheetnum)  # ★note渡す
-
-            if "宿泊_note" in HEADER_COL:
-                # 宿泊_note は値として口コミをまとめ、note には付けない（必要なら付けてもOK）
-                write_spreadsheet(f"{HEADER_COL['宿泊_note']}{rownum}", "\n".join(picked), sheetnum=sheetnum)
-
-        else:
-            # ★noteがある場合だけ渡る（note_text=Noneなら SpreadSheet側で何もしない）
-            write_spreadsheet(f"{cat_col}{rownum}", max_count, note_text, sheetnum=sheetnum)
 
 
 

@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import os, requests, json
 import unicodedata
 import re
+import unicodedata
 
 # 環境変数をロードする
 load_dotenv()
@@ -165,15 +166,19 @@ def write_multi_spreadsheet(cell, value, sheetnum=0):
     _ws(sheetnum).update(cell, value)
 
 
-# スピプレッドシートから書き込み（従来通り：A1指定）
+# スプレッドシートへ書き込み（A1形式指定）
 def write_spreadsheet(cell, value, note=None, sheetnum=0):
     ws = _ws(sheetnum)
     ws.update_acell(cell, value)
 
     if note:
         url = "https://script.google.com/macros/s/AKfycbwV4jBgoDlyphdRxbkGRTNT3DnJ0FWS6Iwxe66aGO0czUb2N3_aMn5zGJfmWU1glN1gbA/exec"
-        data = {'cell': cell, 'note': note}
-        response = requests.post(url, data=json.dumps(data))
+        payload = {
+            "cell": cell,
+            "note": note,
+            "sheetnum": sheetnum,   # ★追加
+        }
+        response = requests.post(url, json=payload, timeout=15)  # ★json= を使う
         print(response.text)
 
 
@@ -227,6 +232,60 @@ def write_spreadsheet_placeapi_rfd(rownum, placeApiInfo, sheetnum=0):
     write_by_header("経度", rownum, placeApiInfo.get("lng", ""), sheetnum=sheetnum)
     write_by_header("住所", rownum, placeApiInfo.get("address", ""), sheetnum=sheetnum)
     write_by_header("URL", rownum, placeApiInfo.get("url", ""), sheetnum=sheetnum)
+
+
+
+_HEADER_COL_CACHE = {}  # key: (spreadsheet_key, sheetnum) -> {header: "A" ...}
+
+def _normalize_header(s: str) -> str:
+    s = unicodedata.normalize("NFKC", s or "")
+    return s.strip()
+
+def _col_letter(n: int) -> str:
+    """1 -> A, 26 -> Z, 27 -> AA ..."""
+    s = ""
+    while n > 0:
+        n, r = divmod(n - 1, 26)
+        s = chr(65 + r) + s
+    return s
+
+def get_header_col_map(sheetnum=0, refresh=False):
+    """
+    1行目のヘッダーから {header: colLetter} を作る
+    """
+    ws = _ws(sheetnum)
+    cache_key = (spreadsheet.id, sheetnum)
+
+    if (not refresh) and cache_key in _HEADER_COL_CACHE:
+        return _HEADER_COL_CACHE[cache_key]
+
+    headers = ws.row_values(1)  # 1行目
+    m = {}
+    for i, h in enumerate(headers, start=1):
+        hh = _normalize_header(h)
+        if hh:
+            m[hh] = _col_letter(i)
+
+    _HEADER_COL_CACHE[cache_key] = m
+    return m
+
+def get_col_by_header(header_name: str, sheetnum=0, fallback=None, refresh=False):
+    """
+    header_name の列文字を返す。無ければ fallback（例: "AE"）を返す。
+    """
+    m = get_header_col_map(sheetnum=sheetnum, refresh=refresh)
+    key = _normalize_header(header_name)
+    col = m.get(key)
+
+    if col:
+        return col
+
+    if fallback:
+        print(f"⚠️ header not found: '{header_name}'. fallback='{fallback}'")
+        return fallback
+
+    raise KeyError(f"Header not found: {header_name}")
+
 
 
 if __name__ == "__main__":
