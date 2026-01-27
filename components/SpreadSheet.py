@@ -2,6 +2,8 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from dotenv import load_dotenv
 import os, requests, json
+import unicodedata
+import re
 
 # 環境変数をロードする
 load_dotenv()
@@ -9,7 +11,10 @@ load_dotenv()
 scope = ['https://www.googleapis.com/auth/spreadsheets']
 
 # サービスアカウントキーファイルへのパス
-creds = ServiceAccountCredentials.from_json_keyfile_name('/Users/abeyuichi/スクレイピング/onsenscraiping-010c634e8f24.json', scope)
+creds = ServiceAccountCredentials.from_json_keyfile_name(
+    '/Users/abeyuichi/スクレイピング/onsenscraiping-010c634e8f24.json',
+    scope
+)
 
 # 認証
 client = gspread.authorize(creds)
@@ -22,20 +27,91 @@ _default_sheetnum = 0
 
 spreadsheet = client.open_by_key(_DEFAULT_SPREADSHEET_KEY)
 
+# ★追加：ヘッダー -> 列番号 のキャッシュ（sheetnumごと）
+_header_cache = {}  # { sheetnum: {"温泉名": 1, "住所": 24, ...} }
+
 
 def configure_spreadsheet(spreadsheet_key: str, default_sheetnum: int = 0):
     """
     ★ main.py から呼んで「書き込み先スプレッドシート」を切り替える
     """
-    global spreadsheet, _default_sheetnum
+    global spreadsheet, _default_sheetnum, _header_cache
     spreadsheet = client.open_by_key(spreadsheet_key)
     _default_sheetnum = default_sheetnum
+    _header_cache = {}  # ★スプレッドシート切替時はキャッシュ破棄
+
 
 def _ws(sheetnum=None):
     """内部：対象worksheetを返す（指定がなければ default_sheetnum）"""
     if sheetnum is None:
         sheetnum = _default_sheetnum
     return spreadsheet.get_worksheet(sheetnum)
+
+
+def _norm_header(s: str) -> str:
+    """
+    ヘッダー比較用の正規化：
+    - NFKC（全角/半角ゆれ吸収）
+    - 前後空白除去
+    """
+    s = unicodedata.normalize("NFKC", (s or ""))
+    return s.strip()
+
+
+def invalidate_header_cache(sheetnum=None):
+    """★追加：ヘッダー行を編集した後などに呼ぶと安全"""
+    global _header_cache
+    if sheetnum is None:
+        _header_cache = {}
+    else:
+        _header_cache.pop(sheetnum, None)
+
+
+def get_header_map(sheetnum=None, header_row: int = 1, force: bool = False) -> dict:
+    """
+    ★追加：指定シートのヘッダー(1行目)から {ヘッダー名: 列番号(1-based)} を作る
+    """
+    if sheetnum is None:
+        sheetnum = _default_sheetnum
+
+    if (not force) and sheetnum in _header_cache:
+        return _header_cache[sheetnum]
+
+    ws = _ws(sheetnum)
+    headers = ws.row_values(header_row)  # 1行目の値リスト（左から）
+    m = {}
+    for i, h in enumerate(headers, start=1):
+        hh = _norm_header(h)
+        if not hh:
+            continue
+        # 同名ヘッダーが複数ある場合は最初を採用（必要なら仕様変更可）
+        if hh not in m:
+            m[hh] = i
+
+    _header_cache[sheetnum] = m
+    return m
+
+
+def col_letter(n: int) -> str:
+    """1 -> A, 26 -> Z, 27 -> AA ..."""
+    s = ""
+    while n > 0:
+        n, r = divmod(n - 1, 26)
+        s = chr(65 + r) + s
+    return s
+
+
+def cell_by_header(header_name: str, rownum: int, sheetnum=None, header_row: int = 1) -> str:
+    """
+    ★追加：ヘッダー名と行番号からセル(A1表記)を作る
+    """
+    hm = get_header_map(sheetnum=sheetnum, header_row=header_row)
+    key = _norm_header(header_name)
+    if key not in hm:
+        raise KeyError(f"Header not found: '{header_name}' (sheetnum={sheetnum})")
+    col_idx = hm[key]  # 1-based
+    return f"{col_letter(col_idx)}{rownum}"
+
 
 # -----------------------------
 # 追加：新規シート（タブ）作成
@@ -51,10 +127,10 @@ def create_new_worksheet(title=None, rows=5000, cols=200):
 
     ws = spreadsheet.add_worksheet(title=title, rows=rows, cols=cols)
 
-    # worksheets.index(ws) は失敗することがあるので、id で探す
     worksheets = spreadsheet.worksheets()
     for i, w in enumerate(worksheets):
         if w.id == ws.id:
+            invalidate_header_cache(i)  # ★新シートのキャッシュを念のため破棄
             return i
 
     # 念のため：タイトルから取り直して再検索
@@ -62,36 +138,52 @@ def create_new_worksheet(title=None, rows=5000, cols=200):
     worksheets = spreadsheet.worksheets()
     for i, w in enumerate(worksheets):
         if w.id == ws2.id:
+            invalidate_header_cache(i)
             return i
 
     raise RuntimeError(f"Created worksheet '{title}' but failed to resolve sheet index.")
-
 
 
 # スピプレッドシートから読み込み
 def read_spreadsheet(cell, sheetnum=None):
     return _ws(sheetnum).acell(cell).value
 
+
+# ★追加：ヘッダー名で読み込み
+def read_by_header(header_name: str, rownum: int, sheetnum=None, header_row: int = 1):
+    cell = cell_by_header(header_name, rownum, sheetnum=sheetnum, header_row=header_row)
+    return read_spreadsheet(cell, sheetnum=sheetnum)
+
+
 # スピプレッドシートから全読み込み
 def read_all_spreadsheet(sheetnum=0):
     return _ws(sheetnum).get_values()
+
 
 # スピプレッドシートから範囲書き込み
 def write_multi_spreadsheet(cell, value, sheetnum=0):
     _ws(sheetnum).update(cell, value)
 
-# スピプレッドシートから書き込み
+
+# スピプレッドシートから書き込み（従来通り：A1指定）
 def write_spreadsheet(cell, value, note=None, sheetnum=0):
     ws = _ws(sheetnum)
     ws.update_acell(cell, value)
 
     if note:
-        url = "https://script.google.com/macros/s/AKfycbx9u3FzZ7Vnu6wo39bJYMH5Oh-Pj0sPUNixlEjHGcYmT6Cys7-y6xlspaoZ13Rq97j9Ig/exec"
+        url = "https://script.google.com/macros/s/AKfycbwV4jBgoDlyphdRxbkGRTNT3DnJ0FWS6Iwxe66aGO0czUb2N3_aMn5zGJfmWU1glN1gbA/exec"
         data = {'cell': cell, 'note': note}
         response = requests.post(url, data=json.dumps(data))
         print(response.text)
 
-# Excelのカラム計算関数
+
+# ★追加：ヘッダー名で書き込み（ヘッダー順が変わっても壊れない）
+def write_by_header(header_name: str, rownum: int, value, note=None, sheetnum=0, header_row: int = 1):
+    cell = cell_by_header(header_name, rownum, sheetnum=sheetnum, header_row=header_row)
+    write_spreadsheet(cell, value, note=note, sheetnum=sheetnum)
+
+
+# Excelのカラム計算関数（互換のため残す）
 def excel_column(index):
     column = ""
     while index > 0:
@@ -99,39 +191,46 @@ def excel_column(index):
         column = chr(65 + remainder) + column
     return column
 
-# 開始時間〜urlの書き込み補助関数
+
+# -----------------------------------------
+# ★修正：PlaceAPI書き込みを「ヘッダー名」基準に
+# -----------------------------------------
 def write_spreadsheet_placeapi(rownum, placeApiInfo, sheetnum=0):
-    base_index = 13  # M
+    """
+    ヘッダー順が変わっても壊れない版。
+    必要なヘッダー名（例）:
+      open_day0 / close_day0 ... open_day6 / close_day6
+      緯度 / 経度 / 住所 / URL
+    """
+    # 念のため：ヘッダーが新しくなってる可能性があるなら force=True にしてもOK
+    # get_header_map(sheetnum=sheetnum, force=True)
+
     for day in range(7):
-        open_key = f"opentime_day_{day}"
-        close_key = f"closetime_day_{day}"
-        write_spreadsheet(f"{excel_column(base_index)}{rownum}", placeApiInfo[open_key], sheetnum=sheetnum)
-        base_index += 1
-        write_spreadsheet(f"{excel_column(base_index)}{rownum}", placeApiInfo[close_key], sheetnum=sheetnum)
-        base_index += 1
+        write_by_header(f"open_day{day}", rownum, placeApiInfo.get(f"opentime_day_{day}", ""), sheetnum=sheetnum)
+        write_by_header(f"close_day{day}", rownum, placeApiInfo.get(f"closetime_day_{day}", ""), sheetnum=sheetnum)
 
-    for data_key in ["lat", "lng", "address", "url"]:
-        write_spreadsheet(f"{excel_column(base_index)}{rownum}", placeApiInfo[data_key], sheetnum=sheetnum)
-        base_index += 1
+    write_by_header("緯度", rownum, placeApiInfo.get("lat", ""), sheetnum=sheetnum)
+    write_by_header("経度", rownum, placeApiInfo.get("lng", ""), sheetnum=sheetnum)
+    write_by_header("住所", rownum, placeApiInfo.get("address", ""), sheetnum=sheetnum)
+    write_by_header("URL", rownum, placeApiInfo.get("url", ""), sheetnum=sheetnum)
 
-# 開始時間〜urlの書き込み補助関数
+
 def write_spreadsheet_placeapi_rfd(rownum, placeApiInfo, sheetnum=0):
-    data_row = []
+    """
+    こちらもヘッダー順に依存しない版（セルごとに書く）
+    """
     for day in range(7):
-        open_key = f"opentime_day_{day}"
-        close_key = f"closetime_day_{day}"
-        data_row.append(placeApiInfo[open_key])
-        data_row.append(placeApiInfo[close_key])
+        write_by_header(f"open_day{day}", rownum, placeApiInfo.get(f"opentime_day_{day}", ""), sheetnum=sheetnum)
+        write_by_header(f"close_day{day}", rownum, placeApiInfo.get(f"closetime_day_{day}", ""), sheetnum=sheetnum)
 
-    write_multi_spreadsheet(f"M{rownum}:Z{rownum}", [data_row], sheetnum)
+    write_by_header("緯度", rownum, placeApiInfo.get("lat", ""), sheetnum=sheetnum)
+    write_by_header("経度", rownum, placeApiInfo.get("lng", ""), sheetnum=sheetnum)
+    write_by_header("住所", rownum, placeApiInfo.get("address", ""), sheetnum=sheetnum)
+    write_by_header("URL", rownum, placeApiInfo.get("url", ""), sheetnum=sheetnum)
 
-    
+
 if __name__ == "__main__":
-    cell_to_read = "A1"
-    cell_to_write = 'B2'  # 例: 'A1'
+    cell_to_write = 'B2'
     value_to_write = 'Hello, world!'
     comment = "コメントはこれ"
-    #read_spreadsheet(cell_to_read)
-    write_spreadsheet(cell_to_write,value_to_write,comment)
-
-
+    write_spreadsheet(cell_to_write, value_to_write, comment)
