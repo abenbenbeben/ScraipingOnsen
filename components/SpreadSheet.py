@@ -5,6 +5,8 @@ import os, requests, json
 import unicodedata
 import re
 import unicodedata
+import time, random
+from gspread.exceptions import APIError
 
 # 環境変数をロードする
 load_dotenv()
@@ -21,25 +23,86 @@ creds = ServiceAccountCredentials.from_json_keyfile_name(
 client = gspread.authorize(creds)
 
 # ----------------------------------------
+# ★ Worksheet キャッシュ（429対策の本丸）
+# ----------------------------------------
+_WS_CACHE = {}          # {sheetnum: Worksheet}
+_WS_LIST_CACHE = None   # [Worksheet, Worksheet, ...]（順番=sheetnum）
+
+def _is_retryable_api_error(e: Exception) -> bool:
+    if not isinstance(e, APIError):
+        return False
+    code = getattr(getattr(e, "response", None), "status_code", None)
+    # 念のため文字列でも判定
+    msg = str(e)
+    return (code in (429, 500, 503, 504)) or ("[429]" in msg) or ("Quota exceeded" in msg)
+
+def _retry(op_name: str, fn, max_retries: int = 7, base_sleep: float = 1.0, max_sleep: float = 60.0):
+    """
+    Sheets API の 429 / 503 等を指数バックオフでリトライ
+    """
+    for attempt in range(max_retries + 1):
+        try:
+            return fn()
+        except Exception as e:
+            if (attempt >= max_retries) or (not _is_retryable_api_error(e)):
+                raise
+            sleep = min(max_sleep, base_sleep * (2 ** attempt)) + random.random()
+            print(f"⚠️ Sheets API retryable error on {op_name}: {e}  -> sleep {sleep:.1f}s")
+            time.sleep(sleep)
+
+def _refresh_worksheets_cache():
+    """
+    worksheets() は1回のメタデータ取得で全WSを取れるので、ここだけ叩いて以降はキャッシュから返す
+    """
+    global _WS_LIST_CACHE, _WS_CACHE
+    _WS_CACHE = {}
+    _WS_LIST_CACHE = _retry("spreadsheet.worksheets()", lambda: spreadsheet.worksheets())
+
+def _ws(sheetnum=None):
+    """
+    内部：対象worksheetを返す（指定がなければ default_sheetnum）
+    ★毎回 get_worksheet() を呼ばない（= metadata read を量産しない）
+    """
+    global _WS_LIST_CACHE
+
+    if sheetnum is None:
+        sheetnum = _default_sheetnum
+
+    if sheetnum in _WS_CACHE:
+        return _WS_CACHE[sheetnum]
+
+    if _WS_LIST_CACHE is None:
+        _refresh_worksheets_cache()
+
+    # sheetnum 範囲外ならキャッシュを更新して再挑戦
+    if sheetnum < 0 or sheetnum >= len(_WS_LIST_CACHE):
+        _refresh_worksheets_cache()
+
+    ws = _WS_LIST_CACHE[sheetnum]
+    _WS_CACHE[sheetnum] = ws
+    return ws
+
+
+# ----------------------------------------
 # ★ デフォルト（今までのままでも動く）
 # ----------------------------------------
 _DEFAULT_SPREADSHEET_KEY = '1xnWPdkeu-ouaSYuDSKDK_MFMpxyEeH_hKjkFFTFI1kM'
 _default_sheetnum = 0
 
 spreadsheet = client.open_by_key(_DEFAULT_SPREADSHEET_KEY)
+_refresh_worksheets_cache()   # ★追加
 
 # ★追加：ヘッダー -> 列番号 のキャッシュ（sheetnumごと）
 _header_cache = {}  # { sheetnum: {"温泉名": 1, "住所": 24, ...} }
 
 
 def configure_spreadsheet(spreadsheet_key: str, default_sheetnum: int = 0):
-    """
-    ★ main.py から呼んで「書き込み先スプレッドシート」を切り替える
-    """
     global spreadsheet, _default_sheetnum, _header_cache
-    spreadsheet = client.open_by_key(spreadsheet_key)
+    spreadsheet = _retry("client.open_by_key()", lambda: client.open_by_key(spreadsheet_key))
     _default_sheetnum = default_sheetnum
-    _header_cache = {}  # ★スプレッドシート切替時はキャッシュ破棄
+    _header_cache = {}
+    _refresh_worksheets_cache()   # ★追加（WSメタデータを1回で取る）
+
 
 
 def _ws(sheetnum=None):
@@ -118,36 +181,29 @@ def cell_by_header(header_name: str, rownum: int, sheetnum=None, header_row: int
 # 追加：新規シート（タブ）作成
 # -----------------------------
 def create_new_worksheet(title=None, rows=5000, cols=200):
-    """
-    新しい worksheet(タブ) を作成し、その sheetnum(0-based index) を返す
-    """
     from datetime import datetime
-
     if title is None:
         title = f"export_{datetime.now():%Y%m%d_%H%M%S}"
 
-    ws = spreadsheet.add_worksheet(title=title, rows=rows, cols=cols)
+    ws = _retry("add_worksheet()", lambda: spreadsheet.add_worksheet(title=title, rows=rows, cols=cols))
 
-    worksheets = spreadsheet.worksheets()
-    for i, w in enumerate(worksheets):
+    # ★ここが重要：追加したら一覧キャッシュ更新
+    _refresh_worksheets_cache()
+    invalidate_header_cache()  # ヘッダキャッシュも安全のため破棄
+
+    # sheetnumを探す
+    for i, w in enumerate(_WS_LIST_CACHE):
         if w.id == ws.id:
-            invalidate_header_cache(i)  # ★新シートのキャッシュを念のため破棄
-            return i
-
-    # 念のため：タイトルから取り直して再検索
-    ws2 = spreadsheet.worksheet(title)
-    worksheets = spreadsheet.worksheets()
-    for i, w in enumerate(worksheets):
-        if w.id == ws2.id:
-            invalidate_header_cache(i)
             return i
 
     raise RuntimeError(f"Created worksheet '{title}' but failed to resolve sheet index.")
 
 
+
 # スピプレッドシートから読み込み
 def read_spreadsheet(cell, sheetnum=None):
-    return _ws(sheetnum).acell(cell).value
+    ws = _ws(sheetnum)
+    return _retry(f"acell({cell})", lambda: ws.acell(cell).value)
 
 
 # ★追加：ヘッダー名で読み込み
@@ -158,28 +214,30 @@ def read_by_header(header_name: str, rownum: int, sheetnum=None, header_row: int
 
 # スピプレッドシートから全読み込み
 def read_all_spreadsheet(sheetnum=0):
-    return _ws(sheetnum).get_values()
+    ws = _ws(sheetnum)
+    return _retry("get_values()", lambda: ws.get_values())
 
 
 # スピプレッドシートから範囲書き込み
 def write_multi_spreadsheet(cell, value, sheetnum=0):
-    _ws(sheetnum).update(cell, value)
+    ws = _ws(sheetnum)
+    return _retry(f"update({cell})", lambda: ws.update(cell, value))
 
 
 # スプレッドシートへ書き込み（A1形式指定）
 def write_spreadsheet(cell, value, note=None, sheetnum=0):
     ws = _ws(sheetnum)
-    ws.update_acell(cell, value)
+    _retry(f"update_acell({cell})", lambda: ws.update_acell(cell, value))
 
     if note:
+        # note付与はAppsScriptなので Sheets quota とは別。ここはそのままでOK
         url = "https://script.google.com/macros/s/AKfycbwV4jBgoDlyphdRxbkGRTNT3DnJ0FWS6Iwxe66aGO0czUb2N3_aMn5zGJfmWU1glN1gbA/exec"
-        payload = {
-            "cell": cell,
-            "note": note,
-            "sheetnum": sheetnum,   # ★追加
-        }
-        response = requests.post(url, json=payload, timeout=15)  # ★json= を使う
-        print(response.text)
+        payload = {"cell": cell, "note": note, "sheetnum": sheetnum}
+        try:
+            response = requests.post(url, json=payload, timeout=15)
+            print(response.text)
+        except Exception as e:
+            print(f"⚠️ note post failed: {e}")
 
 
 # ★追加：ヘッダー名で書き込み（ヘッダー順が変わっても壊れない）

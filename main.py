@@ -43,6 +43,10 @@ ENABLE_IMPORT_FROM_URL = True
 # ★追加：このエリアだけ抽出したい（Noneなら全エリア）
 AREA_FILTER_TEXT = "城東エリア"   # 例: "城東エリア" / "城南エリア" / None
 
+# GoogleMapの口コミ検索クエリに地名を付与する
+ENABLE_LOCATION_IN_KUTIKOMI_QUERY = True
+KUTIKOMI_FALLBACK_PREF = "東京都"   # 他県で回すならここを変える
+
 # 一覧ページURL（実行者が指定）
 SOURCE_LIST_URL = "https://www.supersento.com/kanto/tokyo.html"   # ★ここを差し替え 
 
@@ -80,6 +84,9 @@ DEDUP_ADDR_MATCH  = 0.70
 
 # 重複/類似のログを出す
 LOG_DUPLICATES = True
+
+
+
 
 
 # ==========================================================
@@ -642,7 +649,21 @@ def generate_feature_text(placeName: str, cat_summary: dict) -> tuple[str, str|N
         return fallback, f"Gemini raw:\n{raw}"
 
 
+def build_kutikomi_query(place_name: str, address: str | None, fallback_pref: str = "東京都") -> str:
+    """
+    GoogleMap検索で同名誤ヒットを避けるためのクエリを作る
+    優先: 施設名 + 市区町村（住所から抽出）
+    フォールバック: 施設名 + 東京都（など）
+    """
+    place_name = (place_name or "").strip()
+    address = (address or "").strip()
 
+    cityward = extract_city_ward(address) if address else ""
+    if cityward:
+        return f"{place_name} {cityward}".strip()
+
+    # 住所が無い / 市区町村が取れない場合
+    return f"{place_name} {fallback_pref}".strip()
 
 
 # ==========================================================
@@ -695,22 +716,54 @@ def scraiping_main(rownum, placenum=None, sheetnum=None):
     if fb_status == "SKIP":
         return
 
-    # 口コミページオープン（例外も握る）
+    # 住所を取得（無ければ空）
+    addr_col = HEADER_COL.get("住所")
+    address = ""
+    if addr_col:
+        address = safe_run(
+            "read address",
+            lambda: read_spreadsheet(f"{addr_col}{rownum}", sheetnum=sheetnum),
+            sheetnum=sheetnum,
+            error_cell=f"{addr_col}{rownum}"
+        ) or ""
+
+    # GoogleMap検索クエリ（施設名 + 区市 を優先）
+    query1 = placeName
+    query2 = None
+    if ENABLE_LOCATION_IN_KUTIKOMI_QUERY:
+        query1 = build_kutikomi_query(placeName, address, fallback_pref=KUTIKOMI_FALLBACK_PREF)
+        # フォールバック（区市が取れた場合でも、念のため都道府県版を用意）
+        query2 = f"{placeName} {KUTIKOMI_FALLBACK_PREF}".strip()
+
+    print(f"🔎 kutikomi query: {query1}")
+
     opened = safe_run(
-        "open_kutikomi",
-        lambda: open_kutikomi(driver, placeName, placenum),
+        "open_kutikomi(query1)",
+        lambda: open_kutikomi(driver, query1, placenum),
         sheetnum=sheetnum,
         error_cell=f"{name_col}{rownum}"
     )
+
+
+    # 1回目が失敗したら、都道府県フォールバックでもう一回だけ試す
+    if not opened and ENABLE_LOCATION_IN_KUTIKOMI_QUERY and query2 and query2 != query1:
+        print(f"🔁 retry kutikomi query: {query2}")
+        opened = safe_run(
+            "open_kutikomi(query2)",
+            lambda: open_kutikomi(driver, query2, placenum),
+            sheetnum=sheetnum,
+            error_cell=f"{name_col}{rownum}"
+        )
+
     if not opened:
-        # open_kutikomi が False の場合（同名など）
         safe_run(
             "mark same-name",
-            lambda: write_spreadsheet(f"B{rownum}", "同一名称あり", sheetnum=sheetnum),
+            lambda: write_spreadsheet(f"B{rownum}", "同一名称あり/検索失敗", sheetnum=sheetnum),
             sheetnum=sheetnum,
             error_cell=f"B{rownum}"
         )
         return
+
 
     KUTIKOMI_CATEGORIES = [
         ("サウナ", "サウナ"),
