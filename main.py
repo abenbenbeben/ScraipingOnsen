@@ -5,6 +5,8 @@ from selenium.webdriver.support import expected_conditions as EC
 import time, sys, re, json
 from datetime import datetime
 import traceback
+import os, platform, subprocess, signal, tempfile, shutil
+
 
 from components.ConnectGemini import requestGemini
 
@@ -67,7 +69,7 @@ SKIP_IF_EXISTS = False
 
 # --- (D) 施設調査を回す行範囲（A列が埋まった後に回す） ---
 RUN_FULL_SCRAPING = True
-TEST_ROW_FROM = 2
+TEST_ROW_FROM = 7
 TEST_ROW_TO = 50   # rangeの終点は含まれないので注意
 
 PLACENUM = None
@@ -112,8 +114,69 @@ def col_letter(n: int) -> str:
 HEADER_COL = {name: col_letter(i + 1) for i, name in enumerate(OUTPUT_HEADERS)}
 
 
+# Selenium用の専用プロファイル（ここがコツ：これを使うChromeだけを狙い撃ちでkillできる）
+SELENIUM_PROFILE_DIR = os.path.join(tempfile.gettempdir(), "onsen_matching_selenium_profile")
 
-driver = webdriver.Chrome()
+def _ps_list_posix():
+    # mac/linux: pid と cmdline を全部取る
+    out = subprocess.check_output(["ps", "-axo", "pid=,command="], text=True)
+    for line in out.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        pid_str, cmd = line.split(None, 1)
+        yield int(pid_str), cmd
+
+def _kill_pid_posix(pid: int):
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    except Exception:
+        pass
+
+def cleanup_orphaned_selenium():
+    """
+    1) 前回残った Chrome(このプロファイル利用中) を kill
+    2) chromedriver を kill（他のseleniumも一緒に消える可能性あり）
+    3) プロファイルディレクトリを削除（ロック回避）
+    """
+    system = platform.system()
+
+    if system in ("Darwin", "Linux"):
+        # (A) このスクリプトのプロファイルを使ってる Chrome を狙い撃ちで kill
+        for pid, cmd in _ps_list_posix():
+            if pid == os.getpid():
+                continue
+            if SELENIUM_PROFILE_DIR in cmd:
+                _kill_pid_posix(pid)
+
+        # (B) chromedriver が残ってるなら kill（雑に全部落ちる点は注意）
+        # 安全にしたいならこの行はコメントアウトしてもOK
+        subprocess.run(["pkill", "-x", "chromedriver"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        # (C) プロファイル削除（「user data dir is already in use」対策）
+        shutil.rmtree(SELENIUM_PROFILE_DIR, ignore_errors=True)
+
+    elif system == "Windows":
+        # chromedriver を終了
+        subprocess.run(["taskkill", "/F", "/IM", "chromedriver.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # プロファイル削除
+        shutil.rmtree(SELENIUM_PROFILE_DIR, ignore_errors=True)
+
+def create_driver():
+    options = webdriver.ChromeOptions()
+    options.add_argument(f"--user-data-dir={SELENIUM_PROFILE_DIR}")
+    options.add_argument("--no-first-run")
+    options.add_argument("--no-default-browser-check")
+    # options.add_argument("--headless=new")  # 画面不要ならON
+    return webdriver.Chrome(options=options)
+
+
+
+
+# driver = webdriver.Chrome()  ← これを消す
+driver = None
 
 
 # ---------------------------
@@ -574,24 +637,62 @@ def _uniq_keep_order(items):
 def write_reviews_to_cols(sheetnum, rownum, prefix, reviews, max_n=10):
     reviews = _uniq_keep_order(reviews)[:max_n]
 
-    for i in range(1, max_n + 1):
-        h = f"{prefix}_口コミ{i}"
-        col = HEADER_COL.get(h)
-        if not col:
-            continue
+    # 1行ぶんの横並び配列（足りない分は空）
+    row_values = [(reviews[i] if i < len(reviews) else "") for i in range(max_n)]
 
-        cell = f"{col}{rownum}"
-        value = reviews[i-1] if i-1 < len(reviews) else ""
+    # 口コミ1〜口コミN は同一行で横に連続している前提（OUTPUT_HEADER_TEXT順）
+    start_col = HEADER_COL.get(f"{prefix}_口コミ1")
+    end_col   = HEADER_COL.get(f"{prefix}_口コミ{max_n}")
 
-        # ★1セル書き込みで落ちても続行
-        safe_run(
-            f"write_review {h}",
-            lambda: write_spreadsheet(cell, value, sheetnum=sheetnum),
-            sheetnum=sheetnum,
-            error_cell=cell
-        )
+    # 連続していない/見つからない場合は従来通りにフォールバック
+    if not start_col or not end_col:
+        for i in range(1, max_n + 1):
+            h = f"{prefix}_口コミ{i}"
+            col = HEADER_COL.get(h)
+            if not col:
+                continue
+            cell = f"{col}{rownum}"
+            value = row_values[i-1]
+            write_spreadsheet(cell, value, sheetnum=sheetnum)
+        return reviews
 
+    # ★ここが本命：10セルを1回で更新
+    write_multi_spreadsheet(
+        f"{start_col}{rownum}:{end_col}{rownum}",
+        [row_values],
+        sheetnum=sheetnum
+    )
     return reviews
+
+
+def write_placeapi_bulk(rownum, placeApiInfo, sheetnum=0):
+    # ★open_day0 〜 URL までが OUTPUT_HEADER_TEXT 順で連続している前提
+    headers = []
+    values = []
+
+    for day in range(7):
+        headers.append(f"open_day{day}")
+        values.append(placeApiInfo.get(f"opentime_day_{day}", ""))
+
+        headers.append(f"close_day{day}")
+        values.append(placeApiInfo.get(f"closetime_day_{day}", ""))
+
+    headers += ["緯度", "経度", "住所", "URL"]
+    values  += [
+        placeApiInfo.get("lat", ""),
+        placeApiInfo.get("lng", ""),
+        placeApiInfo.get("address", ""),
+        placeApiInfo.get("url", ""),
+    ]
+
+    start_col = HEADER_COL[headers[0]]
+    end_col   = HEADER_COL[headers[-1]]
+
+    write_multi_spreadsheet(
+        f"{start_col}{rownum}:{end_col}{rownum}",
+        [values],
+        sheetnum=sheetnum
+    )
 
 
 
@@ -789,12 +890,7 @@ def scraiping_main(rownum, placenum=None, sheetnum=None):
             continue
 
         # キーワードの読み込みが失敗しても空扱いで続行
-        header_keywords = safe_run(
-            f"read keywords {cat_header}",
-            lambda: (read_spreadsheet(f"{cat_col}1", sheetnum=sheetnum) or ""),
-            sheetnum=sheetnum,
-            error_cell=f"{cat_col}{rownum}"
-        ) or ""
+        header_keywords = cat_header
         search_keywords = header_keywords.split(",")
 
         max_count = 0
@@ -849,8 +945,8 @@ def scraiping_main(rownum, placenum=None, sheetnum=None):
 
     if placeApiInfo:
         safe_run(
-            "write_spreadsheet_placeapi",
-            lambda: write_spreadsheet_placeapi(rownum, placeApiInfo, sheetnum=sheetnum),
+            "write_placeapi_bulk",
+            lambda: write_placeapi_bulk(rownum, placeApiInfo, sheetnum=sheetnum),
             sheetnum=sheetnum,
             error_cell=f"{HEADER_COL.get('URL','A')}{rownum}"
         )
@@ -910,9 +1006,11 @@ def scraiping_main(rownum, placenum=None, sheetnum=None):
 # ==========================================================
 if __name__ == "__main__":
     try:
-        configure_spreadsheet(TARGET_SPREADSHEET_KEY, default_sheetnum=TARGET_SHEETNUM)
+        cleanup_orphaned_selenium()   # ★起動前に残骸掃除
 
-        # check_firewall が落ちても継続したいなら safe_run 化
+        driver = create_driver()      # ★tryの中で生成（finallyで確実に閉じられる）
+
+        configure_spreadsheet(TARGET_SPREADSHEET_KEY, default_sheetnum=TARGET_SHEETNUM)
         safe_run("check_firewall", lambda: check_firewall())
 
         sheetnum_to_use = TARGET_SHEETNUM
@@ -927,7 +1025,6 @@ if __name__ == "__main__":
 
         if RUN_FULL_SCRAPING:
             for value in range(TEST_ROW_FROM, TEST_ROW_TO):
-                # ★1行ごとに握る（ここが大事）
                 safe_run(
                     f"scraiping_main row={value}",
                     lambda v=value: scraiping_main(v, placenum=PLACENUM, sheetnum=sheetnum_to_use),
@@ -939,8 +1036,10 @@ if __name__ == "__main__":
 
     finally:
         try:
-            driver.quit()
+            if driver:
+                driver.quit()
         except Exception:
             pass
+
 
 
