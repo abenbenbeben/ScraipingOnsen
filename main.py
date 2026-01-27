@@ -2,8 +2,11 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import time, sys, re
+import time, sys, re, json
 from datetime import datetime
+import traceback
+
+from components.ConnectGemini import requestGemini
 
 sys.path.append('../')
 
@@ -86,7 +89,7 @@ LOG_DUPLICATES = True
 # ★固定ヘッダー（この順で出力）
 # ==========================================================
 OUTPUT_HEADER_TEXT = """
-温泉名	サウナ	ロウリュウ,ロウリュ	塩サウナ	泥	水風呂	天然	炭酸風呂,炭酸泉	漫画	Wi-fi,wifi	岩盤	洗顔	宿泊	open_day0	close_day0	open_day1	close_day1	open_day2	close_day2	open_day3	close_day3	open_day4	close_day4	open_day5	close_day5	open_day6	close_day6	緯度	経度	住所	URL	平日値段	休日値段	値段ソース(空)	駅距離	駅時間	最寄駅	image1	image2	image3	image4	image5	image6	image7	特徴	docId	onsenId	サウナ_口コミ1	サウナ_口コミ2	サウナ_口コミ3	サウナ_口コミ4	サウナ_口コミ5	サウナ_口コミ6	サウナ_口コミ7	サウナ_口コミ8	サウナ_口コミ9	サウナ_口コミ10	ロウリュウ,ロウリュ_口コミ1	ロウリュウ,ロウリュ_口コミ2	ロウリュウ,ロウリュ_口コミ3	ロウリュウ,ロウリュ_口コミ4	ロウリュウ,ロウリュ_口コミ5	ロウリュウ,ロウリュ_口コミ6	ロウリュウ,ロウリュ_口コミ7	ロウリュウ,ロウリュ_口コミ8	ロウリュウ,ロウリュ_口コミ9	ロウリュウ,ロウリュ_口コミ10	塩サウナ_口コミ1	塩サウナ_口コミ2	塩サウナ_口コミ3	塩サウナ_口コミ4	塩サウナ_口コミ5	塩サウナ_口コミ6	塩サウナ_口コミ7	塩サウナ_口コミ8	塩サウナ_口コミ9	塩サウナ_口コミ10	泥_口コミ1	泥_口コミ2	泥_口コミ3	泥_口コミ4	泥_口コミ5	泥_口コミ6	泥_口コミ7	泥_口コミ8	泥_口コミ9	泥_口コミ10	水風呂_口コミ1	水風呂_口コミ2	水風呂_口コミ3	水風呂_口コミ4	水風呂_口コミ5	水風呂_口コミ6	水風呂_口コミ7	水風呂_口コミ8	水風呂_口コミ9	水風呂_口コミ10	天然_口コミ1	天然_口コミ2	天然_口コミ3	天然_口コミ4	天然_口コミ5	天然_口コミ6	天然_口コミ7	天然_口コミ8	天然_口コミ9	天然_口コミ10	炭酸風呂,炭酸泉_口コミ1	炭酸風呂,炭酸泉_口コミ2	炭酸風呂,炭酸泉_口コミ3	炭酸風呂,炭酸泉_口コミ4	炭酸風呂,炭酸泉_口コミ5	炭酸風呂,炭酸泉_口コミ6	炭酸風呂,炭酸泉_口コミ7	炭酸風呂,炭酸泉_口コミ8	炭酸風呂,炭酸泉_口コミ9	炭酸風呂,炭酸泉_口コミ10	漫画_口コミ1	漫画_口コミ2	漫画_口コミ3	漫画_口コミ4	漫画_口コミ5	漫画_口コミ6	漫画_口コミ7	漫画_口コミ8	漫画_口コミ9	漫画_口コミ10	Wi-fi,wifi_口コミ1	Wi-fi,wifi_口コミ2	Wi-fi,wifi_口コミ3	Wi-fi,wifi_口コミ4	Wi-fi,wifi_口コミ5	Wi-fi,wifi_口コミ6	Wi-fi,wifi_口コミ7	Wi-fi,wifi_口コミ8	Wi-fi,wifi_口コミ9	Wi-fi,wifi_口コミ10	岩盤浴_口コミ1	岩盤浴_口コミ2	岩盤浴_口コミ3	岩盤浴_口コミ4	岩盤浴_口コミ5	岩盤浴_口コミ6	岩盤浴_口コミ7	岩盤浴_口コミ8	岩盤浴_口コミ9	岩盤浴_口コミ10	洗顔_口コミ1	洗顔_口コミ2	洗顔_口コミ3	洗顔_口コミ4	洗顔_口コミ5	洗顔_口コミ6	洗顔_口コミ7	洗顔_口コミ8	洗顔_口コミ9	洗顔_口コミ10	宿泊_口コミ1	宿泊_口コミ2	宿泊_口コミ3	宿泊_口コミ4	宿泊_口コミ5	宿泊_口コミ6	宿泊_口コミ7	宿泊_口コミ8	宿泊_口コミ9	宿泊_口コミ10
+温泉名	サウナ	ロウリュウ,ロウリュ	塩サウナ	泥	水風呂	天然	炭酸風呂,炭酸泉	漫画	Wi-fi,wifi	岩盤浴	洗顔	宿泊	open_day0	close_day0	open_day1	close_day1	open_day2	close_day2	open_day3	close_day3	open_day4	close_day4	open_day5	close_day5	open_day6	close_day6	緯度	経度	住所	URL	平日値段	休日値段	値段ソース(空)	駅距離	駅時間	最寄駅	image1	image2	image3	image4	image5	image6	image7	特徴	docId	onsenId	サウナ_口コミ1	サウナ_口コミ2	サウナ_口コミ3	サウナ_口コミ4	サウナ_口コミ5	サウナ_口コミ6	サウナ_口コミ7	サウナ_口コミ8	サウナ_口コミ9	サウナ_口コミ10	ロウリュウ,ロウリュ_口コミ1	ロウリュウ,ロウリュ_口コミ2	ロウリュウ,ロウリュ_口コミ3	ロウリュウ,ロウリュ_口コミ4	ロウリュウ,ロウリュ_口コミ5	ロウリュウ,ロウリュ_口コミ6	ロウリュウ,ロウリュ_口コミ7	ロウリュウ,ロウリュ_口コミ8	ロウリュウ,ロウリュ_口コミ9	ロウリュウ,ロウリュ_口コミ10	塩サウナ_口コミ1	塩サウナ_口コミ2	塩サウナ_口コミ3	塩サウナ_口コミ4	塩サウナ_口コミ5	塩サウナ_口コミ6	塩サウナ_口コミ7	塩サウナ_口コミ8	塩サウナ_口コミ9	塩サウナ_口コミ10	泥_口コミ1	泥_口コミ2	泥_口コミ3	泥_口コミ4	泥_口コミ5	泥_口コミ6	泥_口コミ7	泥_口コミ8	泥_口コミ9	泥_口コミ10	水風呂_口コミ1	水風呂_口コミ2	水風呂_口コミ3	水風呂_口コミ4	水風呂_口コミ5	水風呂_口コミ6	水風呂_口コミ7	水風呂_口コミ8	水風呂_口コミ9	水風呂_口コミ10	天然_口コミ1	天然_口コミ2	天然_口コミ3	天然_口コミ4	天然_口コミ5	天然_口コミ6	天然_口コミ7	天然_口コミ8	天然_口コミ9	天然_口コミ10	炭酸風呂,炭酸泉_口コミ1	炭酸風呂,炭酸泉_口コミ2	炭酸風呂,炭酸泉_口コミ3	炭酸風呂,炭酸泉_口コミ4	炭酸風呂,炭酸泉_口コミ5	炭酸風呂,炭酸泉_口コミ6	炭酸風呂,炭酸泉_口コミ7	炭酸風呂,炭酸泉_口コミ8	炭酸風呂,炭酸泉_口コミ9	炭酸風呂,炭酸泉_口コミ10	漫画_口コミ1	漫画_口コミ2	漫画_口コミ3	漫画_口コミ4	漫画_口コミ5	漫画_口コミ6	漫画_口コミ7	漫画_口コミ8	漫画_口コミ9	漫画_口コミ10	Wi-fi,wifi_口コミ1	Wi-fi,wifi_口コミ2	Wi-fi,wifi_口コミ3	Wi-fi,wifi_口コミ4	Wi-fi,wifi_口コミ5	Wi-fi,wifi_口コミ6	Wi-fi,wifi_口コミ7	Wi-fi,wifi_口コミ8	Wi-fi,wifi_口コミ9	Wi-fi,wifi_口コミ10	岩盤浴_口コミ1	岩盤浴_口コミ2	岩盤浴_口コミ3	岩盤浴_口コミ4	岩盤浴_口コミ5	岩盤浴_口コミ6	岩盤浴_口コミ7	岩盤浴_口コミ8	岩盤浴_口コミ9	岩盤浴_口コミ10	洗顔_口コミ1	洗顔_口コミ2	洗顔_口コミ3	洗顔_口コミ4	洗顔_口コミ5	洗顔_口コミ6	洗顔_口コミ7	洗顔_口コミ8	洗顔_口コミ9	洗顔_口コミ10	宿泊_口コミ1	宿泊_口コミ2	宿泊_口コミ3	宿泊_口コミ4	宿泊_口コミ5	宿泊_口コミ6	宿泊_口コミ7	宿泊_口コミ8	宿泊_口コミ9	宿泊_口コミ10
 """.strip()
 
 OUTPUT_HEADERS = [h for h in re.split(r"[\t\n]+", OUTPUT_HEADER_TEXT) if h]
@@ -260,6 +263,37 @@ def find_duplicate_in_firestore(candidate_name: str, candidate_addr: str, prefix
 
     return False, best, "not_similar", {"name": best_name_score, "addr": best_addr_score}
 
+
+def _short_err(e: Exception, max_chars: int = 900) -> str:
+    et = type(e).__name__
+    msg = str(e)
+    tb = traceback.format_exc()
+    s = f"{et}: {msg}\n\n{tb}"
+    return s[:max_chars]
+
+def safe_run(step_name: str, fn, *, sheetnum=None, error_cell=None, on_error_value="ERR"):
+    """
+    fn() を実行し、例外が起きても止めずに None を返す。
+    error_cell が指定されていれば、そのセルに on_error_value と note(エラー)を書き込む。
+    """
+    try:
+        return fn()
+    except Exception as e:
+        print(f"❌ {step_name} failed: {e}")
+        traceback.print_exc()
+
+        if sheetnum is not None and error_cell:
+            try:
+                write_spreadsheet(
+                    error_cell,
+                    on_error_value,
+                    note=f"[{step_name}]\n{_short_err(e)}",
+                    sheetnum=sheetnum
+                )
+            except Exception as e2:
+                print(f"⚠️ failed to write error note ({step_name}): {e2}")
+
+        return None
 
 
 # ==========================================================
@@ -535,13 +569,79 @@ def write_reviews_to_cols(sheetnum, rownum, prefix, reviews, max_n=10):
 
     for i in range(1, max_n + 1):
         h = f"{prefix}_口コミ{i}"
-        if h not in HEADER_COL:
-            continue  # ヘッダーが無ければスキップ
-        cell = f"{HEADER_COL[h]}{rownum}"
+        col = HEADER_COL.get(h)
+        if not col:
+            continue
+
+        cell = f"{col}{rownum}"
         value = reviews[i-1] if i-1 < len(reviews) else ""
-        write_spreadsheet(cell, value, sheetnum=sheetnum)
+
+        # ★1セル書き込みで落ちても続行
+        safe_run(
+            f"write_review {h}",
+            lambda: write_spreadsheet(cell, value, sheetnum=sheetnum),
+            sheetnum=sheetnum,
+            error_cell=cell
+        )
 
     return reviews
+
+
+
+def _clean_json_text(s: str) -> str:
+    s = (s or "").strip()
+    s = re.sub(r"^```(?:json)?\s*", "", s)
+    s = re.sub(r"\s*```$", "", s)
+    return s.strip()
+
+def generate_feature_text(placeName: str, cat_summary: dict) -> tuple[str, str|None]:
+    """
+    cat_summary 例:
+    {
+      "サウナ": {"count": 1, "reviews": ["...","..."]},
+      ...
+    }
+    戻り値: (feature_text, note_evidence)
+    """
+    # “根拠”としてGeminiに渡す素材を作る（短く）
+    lines = [f"施設名: {placeName}"]
+    for cat, v in cat_summary.items():
+        c = v.get("count", 0)
+        lines.append(f"- {cat}: {c}")
+        for r in (v.get("reviews") or [])[:2]:  # 各カテゴリ最大2件だけ
+            lines.append(f"  口コミ: {r}")
+
+    facts = "\n".join(lines)
+
+    system = (
+        "あなたは温浴施設の紹介文作成者です。"
+        "与えられた情報（件数・口コミ）だけを根拠に、施設の特徴を作ってください。"
+        "推測・一般論・外部知識は禁止。根拠が無い内容は絶対に書かない。"
+    )
+    user = (
+        "次の情報だけを使って、特徴を3行で作成してください。\n"
+        "・各行は最大45文字程度\n"
+        "・箇条書き（'・'）で3行\n"
+        "・出力は必ずJSONのみ\n\n"
+        "出力形式:\n"
+        "{\"feature\":\"・...\\n・...\\n・...\",\"evidence\":\"...\"}\n\n"
+        "入力:\n" + facts
+    )
+
+    raw = requestGemini(system, user)
+    raw = _clean_json_text(raw)
+
+    try:
+        obj = json.loads(raw)
+        feature = (obj.get("feature") or "").strip()
+        evidence = (obj.get("evidence") or "").strip() or None
+        return feature, evidence
+    except Exception:
+        # JSONで返らない時はフォールバック（最低限）
+        fallback = "・口コミ情報不足\n・設備情報不足\n・要手動確認"
+        return fallback, f"Gemini raw:\n{raw}"
+
+
 
 
 
@@ -552,39 +652,66 @@ def scraiping_main(rownum, placenum=None, sheetnum=None):
     if sheetnum is None:
         raise ValueError("scraiping_main: sheetnum is required")
 
-    # ★ A列の施設名を「指定シート」から読む（温泉名がどの列でもOK）
-    name_col = HEADER_COL["温泉名"]
-    placeName = read_spreadsheet(f"{name_col}{rownum}", sheetnum=sheetnum)
+    # 施設名取得
+    name_col = HEADER_COL.get("温泉名")
+    if not name_col:
+        print("⚠️ ヘッダー『温泉名』が見つからないためスキップ")
+        return
 
-    # 空行はスキップ（安全）
+    placeName = safe_run(
+        "read placeName",
+        lambda: read_spreadsheet(f"{name_col}{rownum}", sheetnum=sheetnum),
+        sheetnum=sheetnum,
+        error_cell=f"{name_col}{rownum}"
+    )
+
     if not placeName or not str(placeName).strip():
-        print(f"⚠️ row {rownum}: A列が空なのでスキップ")
+        print(f"⚠️ row {rownum}: 施設名が空なのでスキップ")
         return
 
-    # ===== Firebaseに同名があるかチェックして通知 =====
-    hits = check_exists_in_firebase(placeName)
+    # Firebase既存チェック（ここで落ちても止めない）
+    def _firebase_check():
+        hits = check_exists_in_firebase(placeName)
+        if hits:
+            msg = f"Firebase既存あり({len(hits)}件)"
+            lines = []
+            for c, d in hits:
+                data = d.to_dict() or {}
+                lines.append(f"- [{c}] docId={d.id} / place={data.get('place','')} / url={data.get('url','')}")
+            note = "\n".join(lines)
+            write_spreadsheet(f"{FIREBASE_EXISTS_COL}{rownum}", msg, note, sheetnum=sheetnum)
+            if SKIP_IF_EXISTS:
+                return "SKIP"
+        else:
+            write_spreadsheet(f"{FIREBASE_EXISTS_COL}{rownum}", "Firebase既存なし", sheetnum=sheetnum)
+        return "OK"
 
-    if hits:
-        msg = f"Firebase既存あり({len(hits)}件)"
-        lines = []
-        for c, d in hits:
-            data = d.to_dict() or {}
-            lines.append(f"- [{c}] docId={d.id} / place={data.get('place','')} / url={data.get('url','')}")
-        note = "\n".join(lines)
-
-        write_spreadsheet(f"{FIREBASE_EXISTS_COL}{rownum}", msg, note, sheetnum=sheetnum)
-
-        if SKIP_IF_EXISTS:
-            return
-    else:
-        write_spreadsheet(f"{FIREBASE_EXISTS_COL}{rownum}", "Firebase既存なし", sheetnum=sheetnum)
-
-    # ===== 口コミページオープン =====
-    if not open_kutikomi(driver, placeName, placenum):
-        write_spreadsheet(f"B{rownum}", "同一名称あり", sheetnum=sheetnum)
+    fb_status = safe_run(
+        "firebase check",
+        _firebase_check,
+        sheetnum=sheetnum,
+        error_cell=f"{FIREBASE_EXISTS_COL}{rownum}"
+    )
+    if fb_status == "SKIP":
         return
 
-    # 口コミ検索するカテゴリ（表示順もここで制御）
+    # 口コミページオープン（例外も握る）
+    opened = safe_run(
+        "open_kutikomi",
+        lambda: open_kutikomi(driver, placeName, placenum),
+        sheetnum=sheetnum,
+        error_cell=f"{name_col}{rownum}"
+    )
+    if not opened:
+        # open_kutikomi が False の場合（同名など）
+        safe_run(
+            "mark same-name",
+            lambda: write_spreadsheet(f"B{rownum}", "同一名称あり", sheetnum=sheetnum),
+            sheetnum=sheetnum,
+            error_cell=f"B{rownum}"
+        )
+        return
+
     KUTIKOMI_CATEGORIES = [
         ("サウナ", "サウナ"),
         ("ロウリュウ,ロウリュ", "ロウリュウ,ロウリュ"),
@@ -595,82 +722,172 @@ def scraiping_main(rownum, placenum=None, sheetnum=None):
         ("炭酸風呂,炭酸泉", "炭酸風呂,炭酸泉"),
         ("漫画", "漫画"),
         ("Wi-fi,wifi", "Wi-fi,wifi"),
-        ("岩盤", "岩盤浴"),  # ★ここだけ列プレフィックスが違う
+        ("岩盤浴", "岩盤浴"),
         ("洗顔", "洗顔"),
-        ("宿泊", "宿泊"),     # ★追加（洗顔の次）
+        ("宿泊", "宿泊"),
     ]
 
     forcount = 0
+    cat_summary = {}
 
     for cat_header, review_prefix in KUTIKOMI_CATEGORIES:
-        cat_col = HEADER_COL[cat_header]
-        search_keywords = (read_spreadsheet(f"{cat_col}1", sheetnum=sheetnum) or "").split(",")
+        cat_col = HEADER_COL.get(cat_header)
+        if not cat_col:
+            continue
+
+        # キーワードの読み込みが失敗しても空扱いで続行
+        header_keywords = safe_run(
+            f"read keywords {cat_header}",
+            lambda: (read_spreadsheet(f"{cat_col}1", sheetnum=sheetnum) or ""),
+            sheetnum=sheetnum,
+            error_cell=f"{cat_col}{rownum}"
+        ) or ""
+        search_keywords = header_keywords.split(",")
 
         max_count = 0
         all_reviews = []
-        notes = []  # note（Gemini判定に使った文章など）があれば貯める
+        notes = []
 
         for keyword in search_keywords:
             keyword = keyword.strip()
             if not keyword:
                 continue
 
-            r = search_kutikomi(driver, keyword, forcount)
+            r = safe_run(
+                f"search_kutikomi {cat_header}:{keyword}",
+                lambda: search_kutikomi(driver, keyword, forcount),
+                sheetnum=sheetnum,
+                error_cell=f"{cat_col}{rownum}"
+            )
             forcount += 1
+
+            if not r:
+                continue
 
             max_count = max(max_count, r.get("count", 0))
             all_reviews.extend(r.get("reviews") or [])
-
             if r.get("note"):
                 notes.append(f"[{keyword}] {r['note']}")
 
-        # 口コミ列は口コミ文だけを書き込む（*_口コミ1..10）
-        write_reviews_to_cols(sheetnum, rownum, review_prefix, all_reviews, max_n=10)
+        picked = safe_run(
+            f"write reviews {cat_header}",
+            lambda: write_reviews_to_cols(sheetnum, rownum, review_prefix, all_reviews, max_n=10),
+            sheetnum=sheetnum,
+            error_cell=f"{cat_col}{rownum}"
+        ) or []
 
-        # このカテゴリの件数は cat_header 列に書く（宿泊も同様）
         note_text = "\n\n".join(notes) if notes else None
-        write_spreadsheet(f"{cat_col}{rownum}", max_count, note_text, sheetnum=sheetnum)
+        safe_run(
+            f"write count {cat_header}",
+            lambda: write_spreadsheet(f"{cat_col}{rownum}", max_count, note_text, sheetnum=sheetnum),
+            sheetnum=sheetnum,
+            error_cell=f"{cat_col}{rownum}"
+        )
 
+        cat_summary[cat_header] = {"count": max_count, "reviews": picked}
 
+    # PlaceAPI（失敗しても後続をスキップしつつ進む）
+    placeApiInfo = safe_run(
+        "get_placeapi_data",
+        lambda: get_placeapi_data(placeName),
+        sheetnum=sheetnum,
+        error_cell=f"{HEADER_COL.get('URL','A')}{rownum}"  # URL列が無ければA
+    )
 
+    if placeApiInfo:
+        safe_run(
+            "write_spreadsheet_placeapi",
+            lambda: write_spreadsheet_placeapi(rownum, placeApiInfo, sheetnum=sheetnum),
+            sheetnum=sheetnum,
+            error_cell=f"{HEADER_COL.get('URL','A')}{rownum}"
+        )
 
-    # GooglePlaceApi
-    placeApiInfo = get_placeapi_data(placeName)
-    # ★ PlaceAPI書き込みも「指定シート」
-    write_spreadsheet_placeapi(rownum, placeApiInfo, sheetnum=sheetnum)
+    # 料金（失敗しても次へ）
+    heijitu_col = HEADER_COL.get("平日値段")
+    safe_run(
+        "ServeCost",
+        lambda: ServeCost(driver, "東京都", placeName, rownum, sheetnum=sheetnum),
+        sheetnum=sheetnum,
+        error_cell=f"{heijitu_col}{rownum}" if heijitu_col else None
+    )
 
-    # ★ 料金/最寄駅/画像も「指定シート」に書く前提で sheetnum を渡す
-    ServeCost(driver, "東京都", placeName, rownum, sheetnum=sheetnum)
-    SearchNearStatiion(placeApiInfo["lat"], placeApiInfo["lng"], rownum, sheetnum=sheetnum)
-    ServeImage(rownum, placeApiInfo["name"], placeApiInfo["url"], sheetnum=sheetnum)
+    # 最寄駅（lat/lngが無ければスキップ）
+    if placeApiInfo and placeApiInfo.get("lat") and placeApiInfo.get("lng"):
+        ekikyori_col = HEADER_COL.get("駅距離")
+        safe_run(
+            "SearchNearStatiion",
+            lambda: SearchNearStatiion(placeApiInfo["lat"], placeApiInfo["lng"], rownum, sheetnum=sheetnum),
+            sheetnum=sheetnum,
+            error_cell=f"{ekikyori_col}{rownum}" if ekikyori_col else None
+        )
+    else:
+        print(f"⚠️ row {rownum}: lat/lng無しのため最寄駅検索スキップ")
+
+    # 画像（失敗しても次へ）
+    img1_col = HEADER_COL.get("image1")
+    safe_run(
+        "ServeImage",
+        lambda: ServeImage(rownum, (placeApiInfo or {}).get("name", placeName), (placeApiInfo or {}).get("url"), sheetnum=sheetnum),
+        sheetnum=sheetnum,
+        error_cell=f"{img1_col}{rownum}" if img1_col else None
+    )
+
+    # 特徴（失敗しても次へ）
+    feat_col = HEADER_COL.get("特徴")
+    if feat_col:
+        res = safe_run(
+            "generate_feature_text",
+            lambda: generate_feature_text(placeName, cat_summary),
+            sheetnum=sheetnum,
+            error_cell=f"{feat_col}{rownum}"
+        )
+        if res:
+            feature_text, evidence = res
+            safe_run(
+                "write feature",
+                lambda: write_spreadsheet(f"{feat_col}{rownum}", feature_text, note=evidence, sheetnum=sheetnum),
+                sheetnum=sheetnum,
+                error_cell=f"{feat_col}{rownum}"
+            )
+
 
 
 # ==========================================================
 # main（★Phase2は必ず sheetnum を決めて渡す）
 # ==========================================================
 if __name__ == "__main__":
-    # まずスプレッドシートを開く（テンプレがあるシートを default に）
-    configure_spreadsheet(TARGET_SPREADSHEET_KEY, default_sheetnum=TARGET_SHEETNUM)
+    try:
+        configure_spreadsheet(TARGET_SPREADSHEET_KEY, default_sheetnum=TARGET_SHEETNUM)
 
-    check_firewall()
+        # check_firewall が落ちても継続したいなら safe_run 化
+        safe_run("check_firewall", lambda: check_firewall())
 
-    # Phase1で作った「新規シート」のsheetnumを保持
-    sheetnum_to_use = TARGET_SHEETNUM
+        sheetnum_to_use = TARGET_SHEETNUM
 
-    # ★URLから施設名を抽出して、新規シートへA列投入
-    if ENABLE_IMPORT_FROM_URL:
-        new_sheetnum = import_facilities_to_new_sheet(
-            SOURCE_LIST_URL,
-            area_filter_text=AREA_FILTER_TEXT
-        )
-        sheetnum_to_use = new_sheetnum  # ★これが最重要：Phase2はここへ書く
+        if ENABLE_IMPORT_FROM_URL:
+            new_sheetnum = safe_run(
+                "import_facilities_to_new_sheet",
+                lambda: import_facilities_to_new_sheet(SOURCE_LIST_URL, area_filter_text=AREA_FILTER_TEXT)
+            )
+            if new_sheetnum is not None:
+                sheetnum_to_use = new_sheetnum
 
-    # ★A列が埋まった前提で、必要なら施設調査を回す（必ず sheetnum を渡す）
-    if RUN_FULL_SCRAPING:
-        for value in range(TEST_ROW_FROM, TEST_ROW_TO):
-            scraiping_main(value, placenum=PLACENUM, sheetnum=sheetnum_to_use)
-            print("休憩中")
-            time.sleep(30)
+        if RUN_FULL_SCRAPING:
+            for value in range(TEST_ROW_FROM, TEST_ROW_TO):
+                # ★1行ごとに握る（ここが大事）
+                safe_run(
+                    f"scraiping_main row={value}",
+                    lambda v=value: scraiping_main(v, placenum=PLACENUM, sheetnum=sheetnum_to_use),
+                    sheetnum=sheetnum_to_use,
+                    error_cell=f"{HEADER_COL.get('温泉名','A')}{value}"
+                )
+                print("休憩中")
+                time.sleep(30)
 
-    driver.quit()
+    finally:
+        try:
+            driver.quit()
+        except Exception:
+            pass
+
 

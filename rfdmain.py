@@ -132,7 +132,7 @@ def retrieveFirebase_v2_with_reviews(target_sheetnum: int):
     header = []
 
     # 既存の基本列（あなたの現在の順番そのまま）
-    header += ["温泉名", "サウナ", "ロウリュ", "塩サウナ", "泥", "水風呂", "天然", "炭酸", "漫画", "wifi", "岩盤", "洗顔"]
+    header += ["温泉名", "サウナ", "ロウリュ", "塩サウナ", "泥", "水風呂", "天然", "炭酸", "漫画", "wifi", "岩盤浴", "洗顔"]
     # 営業時間（day=0..6 open/close）
     for d in range(7):
         header += [f"open_day{d}", f"close_day{d}"]
