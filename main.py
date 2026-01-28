@@ -72,7 +72,6 @@ RUN_FULL_SCRAPING = True
 TEST_ROW_FROM = 7
 TEST_ROW_TO = 50   # rangeの終点は含まれないので注意
 
-PLACENUM = None
 
 # --- (E) URL取り込み時のFirebase重複除外（NEW） ---
 ENABLE_FIREBASE_DEDUP_ON_IMPORT = True
@@ -770,7 +769,7 @@ def build_kutikomi_query(place_name: str, address: str | None, fallback_pref: st
 # ==========================================================
 # 既存の scraiping_main（★必ず sheetnum を受け取り、全 read/write に渡す）
 # ==========================================================
-def scraiping_main(rownum, placenum=None, sheetnum=None):
+def scraiping_main(rownum, sheetnum=None):
     if sheetnum is None:
         raise ValueError("scraiping_main: sheetnum is required")
 
@@ -840,7 +839,7 @@ def scraiping_main(rownum, placenum=None, sheetnum=None):
 
     opened = safe_run(
         "open_kutikomi(query1)",
-        lambda: open_kutikomi(driver, query1, placenum),
+        lambda: open_kutikomi(driver, query1),
         sheetnum=sheetnum,
         error_cell=f"{name_col}{rownum}"
     )
@@ -851,7 +850,7 @@ def scraiping_main(rownum, placenum=None, sheetnum=None):
         print(f"🔁 retry kutikomi query: {query2}")
         opened = safe_run(
             "open_kutikomi(query2)",
-            lambda: open_kutikomi(driver, query2, placenum),
+            lambda: open_kutikomi(driver, query2),
             sheetnum=sheetnum,
             error_cell=f"{name_col}{rownum}"
         )
@@ -1027,7 +1026,7 @@ if __name__ == "__main__":
             for value in range(TEST_ROW_FROM, TEST_ROW_TO):
                 safe_run(
                     f"scraiping_main row={value}",
-                    lambda v=value: scraiping_main(v, placenum=PLACENUM, sheetnum=sheetnum_to_use),
+                    lambda v=value: scraiping_main(v, sheetnum=sheetnum_to_use),
                     sheetnum=sheetnum_to_use,
                     error_cell=f"{HEADER_COL.get('温泉名','A')}{value}"
                 )
